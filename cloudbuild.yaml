@@ -46,7 +46,7 @@ steps:
       - '--port'
       - '8080'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production'
+      - 'ENVIRONMENT=production,FIRESTORE_PROJECT_ID=${PROJECT_ID},SESSION_TTL_HOURS=72'
     id: 'deploy-cloudrun'
     waitFor: ['push-image']
 
