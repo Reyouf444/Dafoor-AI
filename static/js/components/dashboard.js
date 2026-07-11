@@ -2,6 +2,8 @@
    Dafoor AI - Dashboard Component (Vanilla JS)
    ========================================================================== */
 
+import { PDFDocument } from 'pdf-lib';
+
 export async function renderDashboard(container, app) {
     let pdfs = [];
     
@@ -180,67 +182,216 @@ export async function renderDashboard(container, app) {
             const dt = e.dataTransfer;
             const files = dt.files;
             if (files.length) {
-                handleUpload(files[0]);
+                handleFileSelected(files[0]);
             }
         });
 
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length) {
-                handleUpload(fileInput.files[0]);
+                handleFileSelected(fileInput.files[0]);
             }
         });
 
-        // Upload handler
-        async function handleUpload(file) {
-            if (!file.name.endsWith('.pdf')) {
-                app.showToast("Only PDF files are supported.", "error");
+        // ── PDF Size Gate ─────────────────────────────────────────────────────
+        // Entry point: called whenever a file is chosen (drop or browse)
+        async function handleFileSelected(file) {
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                app.showToast('Only PDF files are supported.', 'error');
                 return;
             }
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
+
+            const LIMIT_BYTES = 30 * 1024 * 1024; // 30 MB
+
+            if (file.size > LIMIT_BYTES) {
+                // File is too large — open the splitter modal
+                await showSplitterModal(file);
+            } else {
+                // File is within limit — upload directly
+                await uploadToGCS(file, file.name);
+            }
+        }
+
+        // ── PDF Splitter Modal ────────────────────────────────────────────────
+        async function showSplitterModal(file) {
+            // Read total page count with pdf-lib
+            let totalPages = '?';
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+                totalPages = pdfDoc.getPageCount();
+            } catch (err) {
+                console.warn('Could not read page count:', err);
+            }
+
+            // Inject modal into DOM
+            const overlay = document.createElement('div');
+            overlay.id = 'splitter-overlay';
+            overlay.innerHTML = `
+                <div class="splitter-modal" role="dialog" aria-modal="true" aria-labelledby="splitter-title">
+                    <div class="splitter-header">
+                        <i class="fa-solid fa-scissors" style="color: var(--color-primary);"></i>
+                        <h3 id="splitter-title">PDF Too Large — Split It First</h3>
+                    </div>
+
+                    <p class="splitter-desc">
+                        <strong title="${file.name}">${file.name.length > 45 ? file.name.slice(0, 42) + '…' : file.name}</strong>
+                        is <strong>${formatBytes(file.size)}</strong>, which exceeds the 30 MB upload limit.
+                        Select a page range to extract a smaller PDF and upload that instead.
+                    </p>
+
+                    <div class="splitter-info-row">
+                        <span><i class="fa-regular fa-file-pdf"></i> Total pages: <strong>${totalPages}</strong></span>
+                    </div>
+
+                    <div class="splitter-range">
+                        <div class="form-group">
+                            <label class="form-label" for="split-start">Start Page</label>
+                            <input type="number" id="split-start" class="form-input" min="1" max="${totalPages}" value="1" />
+                        </div>
+                        <div class="splitter-range-sep">→</div>
+                        <div class="form-group">
+                            <label class="form-label" for="split-end">End Page</label>
+                            <input type="number" id="split-end" class="form-input" min="1" max="${totalPages}" value="${totalPages}" />
+                        </div>
+                    </div>
+
+                    <p id="splitter-error" class="splitter-error hidden"></p>
+
+                    <div class="splitter-actions">
+                        <button id="splitter-cancel-btn" class="btn btn-secondary">
+                            <i class="fa-solid fa-xmark"></i> Cancel
+                        </button>
+                        <button id="splitter-confirm-btn" class="btn btn-primary">
+                            <i class="fa-solid fa-scissors"></i> Extract &amp; Upload
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // Animate in
+            requestAnimationFrame(() => overlay.classList.add('visible'));
+
+            function closeModal() {
+                overlay.classList.remove('visible');
+                setTimeout(() => overlay.remove(), 300);
+            }
+
+            document.getElementById('splitter-cancel-btn').addEventListener('click', closeModal);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+            document.getElementById('splitter-confirm-btn').addEventListener('click', async () => {
+                const errorEl = document.getElementById('splitter-error');
+                const startVal = parseInt(document.getElementById('split-start').value, 10);
+                const endVal   = parseInt(document.getElementById('split-end').value, 10);
+
+                // Validate range
+                if (isNaN(startVal) || isNaN(endVal) || startVal < 1 || endVal < startVal || endVal > totalPages) {
+                    errorEl.textContent = `Please enter a valid range between 1 and ${totalPages}.`;
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                errorEl.classList.add('hidden');
+
+                // Update button state
+                const confirmBtn = document.getElementById('splitter-confirm-btn');
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing…';
+
+                try {
+                    // ── Extract page range with pdf-lib ───────────────────────
+                    const arrayBuffer = await file.arrayBuffer();
+                    const srcDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+
+                    const newDoc = await PDFDocument.create();
+                    // pdf-lib uses 0-based page indices
+                    const indices = Array.from(
+                        { length: endVal - startVal + 1 },
+                        (_, i) => startVal - 1 + i
+                    );
+                    const copiedPages = await newDoc.copyPagesFrom(srcDoc, indices);
+                    copiedPages.forEach(page => newDoc.addPage(page));
+
+                    const newPdfBytes = await newDoc.save();
+                    const newBlob = new Blob([newPdfBytes], { type: 'application/pdf' });
+
+                    // Build a descriptive filename: original_p1-p5.pdf
+                    const baseName = file.name.replace(/\.pdf$/i, '');
+                    const newName  = `${baseName}_p${startVal}-p${endVal}.pdf`;
+
+                    closeModal();
+                    // Upload the trimmed blob
+                    await uploadToGCS(newBlob, newName);
+
+                } catch (err) {
+                    errorEl.textContent = `Failed to process PDF: ${err.message}`;
+                    errorEl.classList.remove('hidden');
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerHTML = '<i class="fa-solid fa-scissors"></i> Extract &amp; Upload';
+                }
+            });
+        }
+
+        // ── GCS Signed URL Upload (3 steps) ───────────────────────────────────
+        async function uploadToGCS(blob, filename) {
             progressContainer.classList.remove('hidden');
-            progressBar.style.width = '0%';
-            uploadStatus.innerText = "Uploading file...";
-            uploadPct.innerText = "0%";
+            progressBar.style.width = '5%';
+            uploadStatus.innerText = 'Preparing secure upload…';
+            uploadPct.innerText = '5%';
 
-            // Custom XHR upload to support dynamic progress tracking
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/pdfs/upload', true);
-            xhr.setRequestHeader('Authorization', `Bearer ${app.state.token}`);
+            try {
+                // Step 1: Request a signed PUT URL from our backend
+                const { signed_url, gcs_path } = await app.apiFetch('/api/pdfs/request-upload', {
+                    method: 'POST',
+                    body: JSON.stringify({ filename, file_size: blob.size })
+                });
 
-            xhr.upload.onprogress = (e) => {
-                if (e.lengthComputable) {
-                    const percentage = Math.round((e.loaded / e.total) * 100);
-                    progressBar.style.width = `${percentage}%`;
-                    uploadPct.innerText = `${percentage}%`;
-                    if (percentage === 100) {
-                        uploadStatus.innerText = "Extracting text and scanning...";
-                    }
-                }
-            };
+                // Step 2: PUT the blob directly to GCS (progress tracked via XHR)
+                uploadStatus.innerText = 'Uploading to cloud storage…';
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('PUT', signed_url, true);
+                    xhr.setRequestHeader('Content-Type', 'application/pdf');
 
-            xhr.onload = () => {
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            // Map XHR progress to 10–90% range for a smooth UX
+                            const pct = 10 + Math.round((e.loaded / e.total) * 80);
+                            progressBar.style.width = `${pct}%`;
+                            uploadPct.innerText = `${pct}%`;
+                        }
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve();
+                        else reject(new Error(`GCS upload failed with status ${xhr.status}`));
+                    };
+                    xhr.onerror = () => reject(new Error('Network error during GCS upload.'));
+                    xhr.send(blob);
+                });
+
+                // Step 3: Notify backend to record the metadata in the DB
+                progressBar.style.width = '95%';
+                uploadStatus.innerText = 'Finalising…';
+                uploadPct.innerText = '95%';
+
+                const result = await app.apiFetch('/api/pdfs/confirm-upload', {
+                    method: 'POST',
+                    body: JSON.stringify({ filename, gcs_path, file_size: blob.size })
+                });
+
+                progressBar.style.width = '100%';
+                uploadPct.innerText = '100%';
+
+                pdfs.unshift(result);
+                app.state.pdfs = pdfs;
+                app.showToast(`'${filename}' uploaded successfully.`, 'success');
+                setTimeout(() => { progressContainer.classList.add('hidden'); draw(); }, 600);
+
+            } catch (err) {
                 progressContainer.classList.add('hidden');
-                if (xhr.status === 200) {
-                    const result = JSON.parse(xhr.responseText);
-                    pdfs.unshift(result);
-                    app.state.pdfs = pdfs;
-                    app.showToast(`'${file.name}' uploaded successfully.`, 'success');
-                    draw();
-                } else {
-                    const error = JSON.parse(xhr.responseText);
-                    app.showToast(error.detail || "Upload failed.", 'error');
-                }
-            };
-
-            xhr.onerror = () => {
-                progressContainer.classList.add('hidden');
-                app.showToast("Network upload error.", 'error');
-            };
-
-            xhr.send(formData);
+                app.showToast('Upload failed: ' + err.message, 'error');
+            }
         }
 
         // Save Gemini key
