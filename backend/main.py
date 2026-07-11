@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from backend.database import init_db, execute_write, execute_read_one, execute_read_all
 from backend.auth import hash_password, verify_password, create_session, verify_session, delete_session
 from backend.pdf_parser import generate_quiz
+from backend.storage import generate_upload_signed_url, get_public_url, delete_object
 
 app = FastAPI(title="Dafoor AI")
 
@@ -124,43 +125,70 @@ def get_me(user_id: int = Depends(get_current_user_id)):
 
 # --- PDF Management API ---
 
-@app.post("/api/pdfs/upload")
-async def upload_pdf(
-    file: UploadFile = File(...),
+# ── Step 1 of GCS upload flow ────────────────────────────────────────────────
+class RequestUploadBody(BaseModel):
+    filename: str        # original filename from the browser
+    file_size: int       # byte size reported by the browser
+
+@app.post("/api/pdfs/request-upload")
+def request_upload(
+    body: RequestUploadBody,
     user_id: int = Depends(get_current_user_id)
 ):
-    if not file.filename.endswith(".pdf"):
+    """Return a signed GCS PUT URL.
+
+    The client should PUT the PDF bytes directly to `signed_url` with
+    Content-Type: application/pdf, then call /api/pdfs/confirm-upload.
+    """
+    if not body.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
-        
-    upload_dir = os.path.join(os.path.dirname(__file__), "data", "pdfs")
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    # Store with unique filename to prevent clashes
-    safe_filename = f"{user_id}_{int(os.path.getsize(file.file.fileno()) if os.path.exists(file.file.fileno()) else 0)}_{os.path.basename(file.filename)}"
-    safe_filename = re.sub(r'[^a-zA-Z0-9_.-]', '_', safe_filename)
-    file_path = os.path.join(upload_dir, safe_filename)
-    
-    # Save the file to disk
+
     try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to write file to disk: {e}")
-        
-    # Get file size
-    file_size = os.path.getsize(file_path)
-    
-    # Save metadata in SQLite
+        result = generate_upload_signed_url(
+            user_id=user_id,
+            original_filename=body.filename
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not generate upload URL: {exc}")
+
+    return {
+        "signed_url": result["signed_url"],
+        "gcs_path":   result["gcs_path"],
+        "expires_at": result["expires_at"],
+    }
+
+
+# ── Step 2 of GCS upload flow ────────────────────────────────────────────────
+class ConfirmUploadBody(BaseModel):
+    filename: str    # original filename (for display)
+    gcs_path: str    # object path returned by request-upload
+    file_size: int   # byte size (client-reported, for display)
+
+@app.post("/api/pdfs/confirm-upload")
+def confirm_upload(
+    body: ConfirmUploadBody,
+    user_id: int = Depends(get_current_user_id)
+):
+    """Record PDF metadata in the database after a successful GCS upload."""
+    # Basic sanity check — make sure the path belongs to this user
+    expected_prefix = f"pdfs/{user_id}/"
+    if not body.gcs_path.startswith(expected_prefix):
+        raise HTTPException(status_code=403, detail="Invalid GCS path for this user")
+
+    public_url = get_public_url(body.gcs_path)
+
     pdf_id = execute_write(
         "INSERT INTO pdfs (user_id, filename, file_path, file_size) VALUES (?, ?, ?, ?)",
-        (user_id, file.filename, file_path, file_size)
+        (user_id, body.filename, body.gcs_path, body.file_size)
     )
-    
+
     return {
-        "id": pdf_id,
-        "filename": file.filename,
-        "file_size": file_size
+        "id":         pdf_id,
+        "filename":   body.filename,
+        "file_size":  body.file_size,
+        "public_url": public_url,
     }
+
 
 @app.get("/api/pdfs")
 def list_pdfs(user_id: int = Depends(get_current_user_id)):
@@ -168,7 +196,11 @@ def list_pdfs(user_id: int = Depends(get_current_user_id)):
         "SELECT id, filename, file_size, uploaded_at FROM pdfs WHERE user_id = ? ORDER BY uploaded_at DESC",
         (user_id,)
     )
+    # Attach a public URL to each row
+    for pdf in pdfs:
+        pdf["public_url"] = get_public_url(pdf["file_path"])
     return pdfs
+
 
 @app.delete("/api/pdfs/{pdf_id}")
 def delete_pdf(pdf_id: int, user_id: int = Depends(get_current_user_id)):
@@ -178,15 +210,11 @@ def delete_pdf(pdf_id: int, user_id: int = Depends(get_current_user_id)):
     )
     if not pdf:
         raise HTTPException(status_code=404, detail="PDF document not found")
-        
-    # Delete file from disk
-    if os.path.exists(pdf["file_path"]):
-        try:
-            os.remove(pdf["file_path"])
-        except Exception as e:
-            print(f"Error removing PDF file: {e}")
-            
-    # Delete metadata from DB
+
+    # Delete object from GCS (file_path now stores the GCS object path)
+    delete_object(pdf["file_path"])
+
+    # Remove metadata from DB
     execute_write("DELETE FROM pdfs WHERE id = ?", (pdf_id,))
     return {"success": True}
 
