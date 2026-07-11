@@ -1,0 +1,65 @@
+steps:
+  # ── Step 1: Build the Docker image ──────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--tag'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}'
+      - '--tag'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest'
+      - '--cache-from'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest'
+      - '.'
+    id: 'build-image'
+
+  # ── Step 2: Push image to Artifact Registry ──────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}'
+    id: 'push-image'
+    waitFor: ['build-image']
+
+  # ── Step 3: Deploy to Cloud Run ──────────────────────────────────────────────
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--port'
+      - '8080'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=production'
+    id: 'deploy-cloudrun'
+    waitFor: ['push-image']
+
+# ── Images produced by this build ─────────────────────────────────────────────
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${SHORT_SHA}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:latest'
+
+# ── Substitution variables (override via trigger or --substitutions flag) ──────
+substitutions:
+  _REGION: us-central1        # GCP region
+  _REPO:   dafoor-ai           # Artifact Registry repository name
+  _SERVICE: dafoor-ai          # Cloud Run service name
+
+options:
+  logging: CLOUD_LOGGING_ONLY
