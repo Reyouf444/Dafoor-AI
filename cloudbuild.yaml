@@ -4,11 +4,9 @@ steps:
     args:
       - 'build'
       - '--tag'
-      - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:${SHORT_SHA}'
-      - '--tag'
-      - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:latest'
+      - 'us-central1-docker.pkg.dev/spartan-cosmos-502110-d5/dafoor-ai/dafoor-ai:latest'
       - '--cache-from'
-      - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:latest'
+      - 'us-central1-docker.pkg.dev/spartan-cosmos-502110-d5/dafoor-ai/dafoor-ai:latest'
       - '.'
     id: 'build-image'
 
@@ -16,8 +14,7 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'push'
-      - '--all-tags'
-      - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}'
+      - 'us-central1-docker.pkg.dev/spartan-cosmos-502110-d5/dafoor-ai/dafoor-ai:latest'
     id: 'push-image'
     waitFor: ['build-image']
 
@@ -27,11 +24,11 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - '${_SERVICE}'
+      - 'dafoor-ai'
       - '--image'
-      - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:${SHORT_SHA}'
+      - 'us-central1-docker.pkg.dev/spartan-cosmos-502110-d5/dafoor-ai/dafoor-ai:latest'
       - '--region'
-      - '${_REGION}'
+      - 'us-central1'
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
@@ -52,14 +49,7 @@ steps:
 
 # ── Images produced by this build ─────────────────────────────────────────────
 images:
-  - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:${SHORT_SHA}'
-  - '${_REGION}-docker.pkg.dev/spartan-cosmos-502110-d5/${_REPO}/${_SERVICE}:latest'
-
-# ── Substitution variables (override via trigger or --substitutions flag) ──────
-substitutions:
-  _REGION: us-central1        # GCP region
-  _REPO:   dafoor-ai          # Artifact Registry repository name
-  _SERVICE: dafoor-ai         # Cloud Run service name
+  - 'us-central1-docker.pkg.dev/spartan-cosmos-502110-d5/dafoor-ai/dafoor-ai:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY
