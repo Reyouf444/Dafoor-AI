@@ -309,7 +309,7 @@ export async function renderDashboard(container, app) {
                         { length: endVal - startVal + 1 },
                         (_, i) => startVal - 1 + i
                     );
-                    const copiedPages = await newDoc.copyPagesFrom(srcDoc, indices);
+                    const copiedPages = await newDoc.copyPages(srcDoc, indices);
                     copiedPages.forEach(page => newDoc.addPage(page));
 
                     const newPdfBytes = await newDoc.save();
