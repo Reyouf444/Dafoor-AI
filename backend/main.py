@@ -193,7 +193,7 @@ def confirm_upload(
 @app.get("/api/pdfs")
 def list_pdfs(user_id: int = Depends(get_current_user_id)):
     pdfs = execute_read_all(
-        "SELECT id, filename, file_size, uploaded_at FROM pdfs WHERE user_id = ? ORDER BY uploaded_at DESC",
+        "SELECT id, filename, file_path, file_size, uploaded_at FROM pdfs WHERE user_id = ? ORDER BY uploaded_at DESC",
         (user_id,)
     )
     # Attach a public URL to each row
