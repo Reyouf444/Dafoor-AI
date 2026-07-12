@@ -10,8 +10,8 @@
     --border-color: rgba(255, 255, 255, 0.08);
     --border-hover: rgba(16, 185, 129, 0.4);
     
-    /* Typography */
-    --font-primary: 'Outfit', sans-serif;
+    /* Typography — Noto Kufi Arabic for RTL, Outfit as fallback */
+    --font-primary: 'Noto Kufi Arabic', 'Outfit', sans-serif;
     
     /* Branding Gradients & Colors */
     --color-primary: #10b981;
@@ -64,8 +64,10 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
-    letter-spacing: -0.02em;
+    /* No negative letter-spacing: it breaks Arabic glyph rendering */
+    letter-spacing: 0;
     color: #ffffff;
+    line-height: 1.4;
 }
 
 p {

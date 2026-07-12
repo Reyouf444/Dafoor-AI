@@ -1,10 +1,10 @@
 /* ==========================================================================
-   Dafoor AI - Active Quiz & Review Component (Vanilla JS)
+   Dafoor AI - Active Quiz & Review Component (Vanilla JS) — Arabic UI
    ========================================================================== */
 
 export function renderQuizActive(container, app, quizData) {
     if (!quizData) {
-        app.showToast("No active quiz session found.", 'error');
+        app.showToast("لا توجد جلسة اختبار نشطة.", 'error');
         app.navigateTo('quiz-setup');
         return;
     }
@@ -31,7 +31,7 @@ export function renderQuizActive(container, app, quizData) {
             
             if (secondsRemaining <= 0) {
                 clearInterval(timerInterval);
-                app.showToast("Time's up! Submitting your answers automatically...", 'warning');
+                app.showToast("انتهى الوقت! جارٍ إرسال إجاباتك تلقائيًا...", 'warning');
                 submitQuiz();
             }
         }, 1000);
@@ -70,13 +70,13 @@ export function renderQuizActive(container, app, quizData) {
                 <div class="quiz-sidebar">
                     <!-- Timer -->
                     <div class="timer-panel" id="timer-panel-el">
-                        <div class="timer-title"><i class="fa-regular fa-clock"></i> Time Remaining</div>
+                        <div class="timer-title"><i class="fa-regular fa-clock"></i> الوقت المتبقي</div>
                         <div class="timer-value" id="timer-val-el">--:--</div>
                     </div>
 
                     <!-- Question Status Grid -->
                     <div class="flag-panel">
-                        <div class="flag-grid-title">Question Grid</div>
+                        <div class="flag-grid-title">شبكة الأسئلة</div>
                         <div class="flag-grid" id="flag-buttons-grid">
                             <!-- Numbered buttons loaded dynamically -->
                         </div>
@@ -85,22 +85,22 @@ export function renderQuizActive(container, app, quizData) {
                         <div class="flag-legend">
                             <div class="legend-item">
                                 <div class="legend-dot green"></div>
-                                <span>Answered</span>
+                                <span>تم الإجابة</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-dot gray"></div>
-                                <span>Skipped / Unanswered</span>
+                                <span>لم يُجب / تجاوز</span>
                             </div>
                             <div class="legend-item">
                                 <div class="legend-dot white"></div>
-                                <span>Flagged for Review</span>
+                                <span>مُعلَّم للمراجعة</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Submit Button -->
                     <button id="submit-quiz-btn" class="btn btn-primary" style="width: 100%;">
-                        <i class="fa-solid fa-cloud-arrow-up"></i> Submit Answers
+                        <i class="fa-solid fa-cloud-arrow-up"></i> تسليم الإجابات
                     </button>
                 </div>
             </div>
@@ -119,10 +119,10 @@ export function renderQuizActive(container, app, quizData) {
         
         qCard.innerHTML = `
             <div class="question-header">
-                <span class="question-num">Question ${currentQuestionIdx + 1} of ${totalQuestions}</span>
+                <span class="question-num">السؤال ${currentQuestionIdx + 1} من ${totalQuestions}</span>
                 <button id="flag-btn-toggle" class="flag-action-btn ${isFlagged ? 'flagged' : ''}">
                     <i class="${isFlagged ? 'fa-solid' : 'fa-regular'} fa-flag"></i> 
-                    ${isFlagged ? 'Flagged' : 'Flag Question'}
+                    ${isFlagged ? 'مُعلَّم' : 'تعليم للمراجعة'}
                 </button>
             </div>
             
@@ -143,10 +143,10 @@ export function renderQuizActive(container, app, quizData) {
             
             <div class="quiz-navigation">
                 <button id="prev-q-btn" class="btn btn-secondary" ${currentQuestionIdx === 0 ? 'disabled' : ''}>
-                    <i class="fa-solid fa-arrow-left"></i> Previous
+                    <i class="fa-solid fa-arrow-right"></i> السابق
                 </button>
                 <button id="next-q-btn" class="btn btn-secondary" ${currentQuestionIdx === totalQuestions - 1 ? 'disabled' : ''}>
-                    Next <i class="fa-solid fa-arrow-right"></i>
+                    التالي <i class="fa-solid fa-arrow-left"></i>
                 </button>
             </div>
         `;
@@ -231,9 +231,9 @@ export function renderQuizActive(container, app, quizData) {
         // Main Submit quiz button
         document.getElementById('submit-quiz-btn').addEventListener('click', () => {
             const unansweredCount = userAnswers.filter(a => a === -1).length;
-            let warningMsg = "Are you sure you want to submit your answers?";
+            let warningMsg = "هل أنت متأكد من تسليم إجاباتك؟";
             if (unansweredCount > 0) {
-                warningMsg = `You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`;
+                warningMsg = `لديك ${unansweredCount} سؤال لم تُجب عنه. هل تريد التسليم؟`;
             }
             
             if (confirm(warningMsg)) {
@@ -250,7 +250,7 @@ export function renderQuizActive(container, app, quizData) {
         container.innerHTML = `
             <div class="loader-container" style="flex-direction: column; gap: 20px;">
                 <div class="spinner"></div>
-                <h3>Grading your answers and generating review guide...</h3>
+                <h3>جارٍ تصحيح إجاباتك وإعداد تقرير المراجعة...</h3>
             </div>
         `;
 
@@ -266,10 +266,10 @@ export function renderQuizActive(container, app, quizData) {
                 })
             });
 
-            app.showToast("Quiz submitted successfully!", "success");
+            app.showToast("تم تسليم الاختبار بنجاح!", "success");
             renderResults(result);
         } catch (err) {
-            app.showToast("Failed to submit answers: " + err.message, 'error');
+            app.showToast("فشل تسليم الإجابات: " + err.message, 'error');
             // If failed to submit, draw back the screen
             draw();
         }
@@ -281,33 +281,33 @@ export function renderQuizActive(container, app, quizData) {
         
         const minutes = Math.floor(time_spent_seconds / 60);
         const seconds = time_spent_seconds % 60;
-        const timeStr = `${minutes}m ${seconds}s`;
+        const timeStr = `${minutes}د ${seconds}ث`;
 
         container.innerHTML = `
             <div class="setup-container">
                 <div class="card results-header">
-                    <h2>Quiz Grading Report</h2>
+                    <h2>تقرير تصحيح الاختبار</h2>
                     <p>${title}</p>
                     
                     <div class="score-circle">
                         <span class="score-num">${score}%</span>
-                        <span class="score-label">Final Score</span>
+                        <span class="score-label">الدرجة النهائية</span>
                     </div>
                     
                     <div style="display: flex; justify-content: center; gap: 32px; margin-top: 20px; font-weight: 500;">
                         <div>
-                            <span style="color: #6b7280; font-size: 0.85rem; display: block; text-transform: uppercase;">Correct</span>
+                            <span style="color: #6b7280; font-size: 0.85rem; display: block; text-transform: uppercase;">الإجابات الصحيحة</span>
                             <span style="font-size: 1.3rem; color: var(--color-success);">${correct_answers} / ${total_questions}</span>
                         </div>
                         <div>
-                            <span style="color: #6b7280; font-size: 0.85rem; display: block; text-transform: uppercase;">Time Taken</span>
+                            <span style="color: #6b7280; font-size: 0.85rem; display: block; text-transform: uppercase;">الوقت المستغرق</span>
                             <span style="font-size: 1.3rem; color: var(--color-info);">${timeStr}</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="breakdown-list">
-                    <h3 style="text-align: left; margin-bottom: 8px;"><i class="fa-solid fa-list-check"></i> Answer Breakdown</h3>
+                    <h3 style="text-align: right; margin-bottom: 8px;"><i class="fa-solid fa-list-check"></i> تفصيل الإجابات</h3>
                     
                     ${breakdown.map((item, idx) => {
                         const isCorrect = item.is_correct;
@@ -343,7 +343,7 @@ export function renderQuizActive(container, app, quizData) {
                                 </div>
                                 
                                 <div class="explanation-box">
-                                    <strong>Explanation:</strong> ${item.explanation || "No explanation provided."}
+                                    <strong>التفسير:</strong> ${item.explanation || "لا يوجد تفسير متاح."}
                                 </div>
                             </div>
                         `;
@@ -352,10 +352,10 @@ export function renderQuizActive(container, app, quizData) {
 
                 <div style="margin-top: 32px; display: flex; gap: 16px;">
                     <button id="back-dash-btn" class="btn btn-primary" style="flex: 1;">
-                        <i class="fa-solid fa-house-chimney"></i> Back to Dashboard
+                        <i class="fa-solid fa-house-chimney"></i> العودة للوحة التحكم
                     </button>
                     <button id="retry-btn" class="btn btn-secondary" style="flex: 1;">
-                        <i class="fa-solid fa-rotate-right"></i> Try Another Quiz
+                        <i class="fa-solid fa-rotate-right"></i> اختبار آخر
                     </button>
                 </div>
             </div>

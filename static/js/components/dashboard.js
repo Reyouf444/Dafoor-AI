@@ -30,14 +30,14 @@ export async function renderDashboard(container, app) {
                 <!-- Left Side: Upload Zone & Settings -->
                 <div style="display: flex; flex-direction: column; gap: 24px;">
                     <div class="card">
-                        <h3 class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> Upload Study Materials</h3>
-                        <p style="margin-bottom: 20px;">Upload PDF textbooks, lecture notes, or research papers to auto-generate customized study quizzes.</p>
+                        <h3 class="card-title"><i class="fa-solid fa-cloud-arrow-up"></i> رفع المواد الدراسية</h3>
+                        <p style="margin-bottom: 20px;">ارفع كتبك المدرسية أو ملاحظاتك أو الأوراق البحثية بصيغة PDF لتوليد اختبارات دراسية مخصصة تلقائيًا.</p>
                         
                         <div id="drop-zone" class="upload-zone">
                             <i class="fa-solid fa-file-pdf"></i>
                             <div class="upload-text">
-                                <p style="color: #ffffff; font-weight: 600;">Drag & drop your PDF here</p>
-                                <p style="font-size: 0.85rem; margin-top: 4px;">or click to browse your files</p>
+                                <p style="color: #ffffff; font-weight: 600;">اسحب وأفلت ملف PDF هنا</p>
+                                <p style="font-size: 0.85rem; margin-top: 4px;">أو انقر لاستعراض ملفاتك</p>
                             </div>
                             <input type="file" id="file-input" accept=".pdf" style="display: none;" />
                         </div>
@@ -45,7 +45,7 @@ export async function renderDashboard(container, app) {
                         <!-- Uploading Indicator -->
                         <div id="upload-progress" class="hidden" style="margin-top: 20px; text-align: left;">
                             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 6px;">
-                                <span id="upload-status" style="color: var(--color-primary); font-weight: 600;">Uploading file...</span>
+                                <span id="upload-status" style="color: var(--color-primary); font-weight: 600;">جارٍ رفع الملف...</span>
                                 <span id="upload-pct">0%</span>
                             </div>
                             <div style="width: 100%; height: 6px; background: #1f2937; border-radius: 3px; overflow: hidden;">
@@ -56,43 +56,43 @@ export async function renderDashboard(container, app) {
 
                     <!-- Gemini API Settings -->
                     <div class="card settings-section">
-                        <h3 class="card-title"><i class="fa-solid fa-key"></i> Gemini AI Upgrade (Optional)</h3>
-                        <p style="margin-bottom: 16px; font-size: 0.9rem;">By default, we generate quizzes using a local smart text parser. Paste your Google Gemini API Key below to unlock advanced LLM-based quiz generation.</p>
+                        <h3 class="card-title"><i class="fa-solid fa-key"></i> ترقية Gemini AI (اختياري)</h3>
+                        <p style="margin-bottom: 16px; font-size: 0.9rem;">افتراضيًا، نولّد الاختبارات باستخدام محلل نصي محلي. الصق مفتاح Gemini API أدناه لتفعيل توليد الأسئلة بالذكاء الاصطناعي المتقدم.</p>
                         
                         <div class="form-group" style="margin-bottom: 12px;">
-                            <label class="form-label" for="api-key-input">Gemini API Key</label>
+                            <label class="form-label" for="api-key-input">مفتاح Gemini API</label>
                             <div style="display: flex; gap: 10px;">
                                 <input 
                                     type="password" 
                                     id="api-key-input" 
                                     class="form-input" 
-                                    placeholder="Enter AIzaSy..." 
+                                    placeholder="أدخل AIzaSy..." 
                                     value="${app.state.geminiApiKey || ''}"
                                 />
                                 <button id="save-key-btn" class="btn btn-secondary">
-                                    <i class="fa-solid fa-floppy-disk"></i> Save
+                                    <i class="fa-solid fa-floppy-disk"></i> حفظ
                                 </button>
                             </div>
                         </div>
                         <span id="key-badge" class="legend-dot" style="font-size: 0.8rem; color: #9ca3af; display: flex; align-items: center; gap: 6px;">
                             ${app.state.geminiApiKey 
-                                ? '<i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> Key loaded from local storage' 
-                                : '<i class="fa-solid fa-circle-info"></i> Running local parser engine'}
+                                ? '<i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> تم تحميل المفتاح من التخزين المحلي' 
+                                : '<i class="fa-solid fa-circle-info"></i> يعمل بالمحلل المحلي'}
                         </span>
                     </div>
                 </div>
 
                 <!-- Right Side: PDF Library -->
                 <div class="card" style="display: flex; flex-direction: column;">
-                    <h3 class="card-title"><i class="fa-solid fa-book-bookmark"></i> Study Library</h3>
-                    <p style="margin-bottom: 16px;">Select documents in the Practice tab to construct quizzes.</p>
+                    <h3 class="card-title"><i class="fa-solid fa-book-bookmark"></i> المكتبة الدراسية</h3>
+                    <p style="margin-bottom: 16px;">اختر المستندات في تبويب التدريب لبناء الاختبارات.</p>
                     
                     <div class="pdf-list" id="pdfs-container">
                         <!-- Populated by JS -->
                     </div>
                     
                     <button id="go-setup-btn" class="btn btn-primary" style="margin-top: auto; width: 100%;" ${pdfs.length === 0 ? 'disabled' : ''}>
-                        <i class="fa-solid fa-graduation-cap"></i> Configure Practice Quiz
+                        <i class="fa-solid fa-graduation-cap"></i> ابدأ الاختبار التدريبي
                     </button>
                 </div>
             </div>
@@ -108,7 +108,7 @@ export async function renderDashboard(container, app) {
             container.innerHTML = `
                 <div class="pdf-empty">
                     <i class="fa-regular fa-folder-open" style="font-size: 2.5rem; margin-bottom: 12px; display: block;"></i>
-                    No study materials uploaded yet.
+                    لم يتم رفع أي مواد دراسية بعد.
                 </div>
             `;
             return;
@@ -120,10 +120,10 @@ export async function renderDashboard(container, app) {
                     <i class="fa-solid fa-file-pdf pdf-icon"></i>
                     <div class="pdf-details">
                         <h4 title="${pdf.filename}">${pdf.filename}</h4>
-                        <span>Size: ${formatBytes(pdf.file_size)} • Uploaded: ${new Date(pdf.uploaded_at).toLocaleDateString()}</span>
+                        <span>الحجم: ${formatBytes(pdf.file_size)} • تاريخ الرفع: ${new Date(pdf.uploaded_at).toLocaleDateString('ar-SA')}</span>
                     </div>
                 </div>
-                <button class="btn btn-secondary btn-icon delete-pdf-btn" data-id="${pdf.id}" title="Delete document">
+                <button class="btn btn-secondary btn-icon delete-pdf-btn" data-id="${pdf.id}" title="حذف المستند">
                     <i class="fa-regular fa-trash-can" style="color: var(--color-danger)"></i>
                 </button>
             </div>
@@ -134,15 +134,15 @@ export async function renderDashboard(container, app) {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const id = btn.getAttribute('data-id');
-                if (confirm("Are you sure you want to delete this study document? All generated quizzes based on it will lose references.")) {
+                if (confirm("هل أنت متأكد من حذف هذا المستند الدراسي؟ ستفقد الاختبارات المرتبطة به إشاراتها.")) {
                     try {
                         await app.apiFetch(`/api/pdfs/${id}`, { method: 'DELETE' });
                         pdfs = pdfs.filter(p => p.id !== parseInt(id));
                         app.state.pdfs = pdfs;
-                        app.showToast("Document deleted.", 'success');
+                        app.showToast("تم حذف المستند بنجاح.", 'success');
                         draw();
                     } catch (err) {
-                        app.showToast("Failed to delete PDF: " + err.message, 'error');
+                        app.showToast("فشل حذف الملف: " + err.message, 'error');
                     }
                 }
             });
@@ -196,7 +196,7 @@ export async function renderDashboard(container, app) {
         // Entry point: called whenever a file is chosen (drop or browse)
         async function handleFileSelected(file) {
             if (!file.name.toLowerCase().endsWith('.pdf')) {
-                app.showToast('Only PDF files are supported.', 'error');
+                app.showToast('يُدعم رفع ملفات PDF فقط.', 'error');
                 return;
             }
 
@@ -230,27 +230,27 @@ export async function renderDashboard(container, app) {
                 <div class="splitter-modal" role="dialog" aria-modal="true" aria-labelledby="splitter-title">
                     <div class="splitter-header">
                         <i class="fa-solid fa-scissors" style="color: var(--color-primary);"></i>
-                        <h3 id="splitter-title">PDF Too Large — Split It First</h3>
+                        <h3 id="splitter-title">الملف كبير جدًا — قسّمه أولاً</h3>
                     </div>
 
                     <p class="splitter-desc">
                         <strong title="${file.name}">${file.name.length > 45 ? file.name.slice(0, 42) + '…' : file.name}</strong>
-                        is <strong>${formatBytes(file.size)}</strong>, which exceeds the 30 MB upload limit.
-                        Select a page range to extract a smaller PDF and upload that instead.
+                        حجمه <strong>${formatBytes(file.size)}</strong>، وهو يتجاوز حد الرفع البالغ 30 ميغابايت.
+                        اختر نطاق الصفحات لاستخراج ملف PDF أصغر ورفعه بدلاً منه.
                     </p>
 
                     <div class="splitter-info-row">
-                        <span><i class="fa-regular fa-file-pdf"></i> Total pages: <strong>${totalPages}</strong></span>
+                        <span><i class="fa-regular fa-file-pdf"></i> إجمالي الصفحات: <strong>${totalPages}</strong></span>
                     </div>
 
                     <div class="splitter-range">
                         <div class="form-group">
-                            <label class="form-label" for="split-start">Start Page</label>
+                            <label class="form-label" for="split-start">الصفحة البداية</label>
                             <input type="number" id="split-start" class="form-input" min="1" max="${totalPages}" value="1" />
                         </div>
-                        <div class="splitter-range-sep">→</div>
+                        <div class="splitter-range-sep">←</div>
                         <div class="form-group">
-                            <label class="form-label" for="split-end">End Page</label>
+                            <label class="form-label" for="split-end">الصفحة النهاية</label>
                             <input type="number" id="split-end" class="form-input" min="1" max="${totalPages}" value="${totalPages}" />
                         </div>
                     </div>
@@ -259,10 +259,10 @@ export async function renderDashboard(container, app) {
 
                     <div class="splitter-actions">
                         <button id="splitter-cancel-btn" class="btn btn-secondary">
-                            <i class="fa-solid fa-xmark"></i> Cancel
+                            <i class="fa-solid fa-xmark"></i> إلغاء
                         </button>
                         <button id="splitter-confirm-btn" class="btn btn-primary">
-                            <i class="fa-solid fa-scissors"></i> Extract &amp; Upload
+                            <i class="fa-solid fa-scissors"></i> استخراج ورفع
                         </button>
                     </div>
                 </div>
@@ -287,7 +287,7 @@ export async function renderDashboard(container, app) {
 
                 // Validate range
                 if (isNaN(startVal) || isNaN(endVal) || startVal < 1 || endVal < startVal || endVal > totalPages) {
-                    errorEl.textContent = `Please enter a valid range between 1 and ${totalPages}.`;
+                    errorEl.textContent = `أدخل نطاقًا صحيحًا بين 1 و${totalPages}.`;
                     errorEl.classList.remove('hidden');
                     return;
                 }
@@ -296,7 +296,7 @@ export async function renderDashboard(container, app) {
                 // Update button state
                 const confirmBtn = document.getElementById('splitter-confirm-btn');
                 confirmBtn.disabled = true;
-                confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing…';
+                confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> جارٍ المعالجة…';
 
                 try {
                     // ── Extract page range with pdf-lib ───────────────────────
@@ -324,10 +324,10 @@ export async function renderDashboard(container, app) {
                     await uploadToGCS(newBlob, newName);
 
                 } catch (err) {
-                    errorEl.textContent = `Failed to process PDF: ${err.message}`;
+                    errorEl.textContent = `فشلت معالجة الملف: ${err.message}`;
                     errorEl.classList.remove('hidden');
                     confirmBtn.disabled = false;
-                    confirmBtn.innerHTML = '<i class="fa-solid fa-scissors"></i> Extract &amp; Upload';
+                    confirmBtn.innerHTML = '<i class="fa-solid fa-scissors"></i> استخراج ورفع';
                 }
             });
         }
@@ -336,7 +336,7 @@ export async function renderDashboard(container, app) {
         async function uploadToGCS(blob, filename) {
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '5%';
-            uploadStatus.innerText = 'Preparing secure upload…';
+            uploadStatus.innerText = 'جارٍ تحضير الرفع الآمن…';
             uploadPct.innerText = '5%';
 
             try {
@@ -347,7 +347,7 @@ export async function renderDashboard(container, app) {
                 });
 
                 // Step 2: PUT the blob directly to GCS (progress tracked via XHR)
-                uploadStatus.innerText = 'Uploading to cloud storage…';
+                uploadStatus.innerText = 'جارٍ الرفع إلى التخزين السحابي…';
                 await new Promise((resolve, reject) => {
                     const xhr = new XMLHttpRequest();
                     xhr.open('PUT', signed_url, true);
@@ -364,15 +364,15 @@ export async function renderDashboard(container, app) {
 
                     xhr.onload = () => {
                         if (xhr.status >= 200 && xhr.status < 300) resolve();
-                        else reject(new Error(`GCS upload failed with status ${xhr.status}`));
+                        else reject(new Error(`فشل الرفع إلى GCS بحالة ${xhr.status}`));
                     };
-                    xhr.onerror = () => reject(new Error('Network error during GCS upload.'));
+                    xhr.onerror = () => reject(new Error('خطأ في الشبكة أثناء الرفع.'));
                     xhr.send(blob);
                 });
 
                 // Step 3: Notify backend to record the metadata in the DB
                 progressBar.style.width = '95%';
-                uploadStatus.innerText = 'Finalising…';
+                uploadStatus.innerText = 'جارٍ التأكيد النهائي…';
                 uploadPct.innerText = '95%';
 
                 const result = await app.apiFetch('/api/pdfs/confirm-upload', {
@@ -385,12 +385,12 @@ export async function renderDashboard(container, app) {
 
                 pdfs.unshift(result);
                 app.state.pdfs = pdfs;
-                app.showToast(`'${filename}' uploaded successfully.`, 'success');
+                app.showToast(`تم رفع '${filename}' بنجاح.`, 'success');
                 setTimeout(() => { progressContainer.classList.add('hidden'); draw(); }, 600);
 
             } catch (err) {
                 progressContainer.classList.add('hidden');
-                app.showToast('Upload failed: ' + err.message, 'error');
+                app.showToast('فشل الرفع: ' + err.message, 'error');
             }
         }
 
@@ -400,10 +400,10 @@ export async function renderDashboard(container, app) {
             app.state.geminiApiKey = val;
             if (val) {
                 localStorage.setItem('gemini_api_key', val);
-                app.showToast("Gemini API Key saved locally.", 'success');
+                app.showToast("تم حفظ مفتاح Gemini API محليًا.", 'success');
             } else {
                 localStorage.removeItem('gemini_api_key');
-                app.showToast("Gemini API Key cleared. Now using default local parser.", 'info');
+                app.showToast("تم مسح مفتاح Gemini. يعمل الآن بالمحلل المحلي.", 'info');
             }
             draw();
         });

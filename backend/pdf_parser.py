@@ -3,181 +3,332 @@ import random
 import json
 import urllib.request
 import urllib.error
-from pypdf import PdfReader
 
-# Default high-quality quiz fallback banks (divided by difficulty)
+# ---------------------------------------------------------------------------
+# Arabic text processing helpers — fix reversed / garbled Arabic from PDFs
+# ---------------------------------------------------------------------------
+
+def _reshape_arabic(text: str) -> str:
+    """Reshape and reorder Arabic text extracted from PDFs.
+    
+    PDFs often store Arabic letters in visual (LTR) order with unshaped
+    glyphs. arabic_reshaper + bidi reorder them into correct logical order.
+    """
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+        reshaped = arabic_reshaper.reshape(text)
+        return get_display(reshaped)
+    except Exception:
+        return text  # Return as-is if libraries unavailable
+
+
+def _is_arabic_text(text: str) -> bool:
+    """Return True if the text contains a significant amount of Arabic characters."""
+    if not text:
+        return False
+    arabic_chars = sum(1 for c in text if '\u0600' <= c <= '\u06FF')
+    total_alpha = sum(1 for c in text if c.isalpha())
+    if total_alpha == 0:
+        return False
+    return (arabic_chars / total_alpha) > 0.3
+
+
+# ---------------------------------------------------------------------------
+# Default Arabic fallback question bank
+# ---------------------------------------------------------------------------
+
 DEFAULT_QUESTION_BANK = {
     "Easy": [
         {
-            "question": "What is the primary function of red blood cells in the human body?",
-            "choices": ["To fight infections", "To transport oxygen", "To help blood clot", "To produce hormones"],
+            "question": "ما هي العاصمة المملكة العربية السعودية؟",
+            "choices": ["جدة", "الرياض", "مكة المكرمة", "الدمام"],
             "correct_index": 1,
-            "explanation": "Red blood cells contain hemoglobin, which binds to oxygen and carries it from the lungs to the rest of the body."
+            "explanation": "الرياض هي عاصمة المملكة العربية السعودية ومركزها الإداري والسياسي."
         },
         {
-            "question": "Which planet in our solar system is known as the Red Planet?",
-            "choices": ["Venus", "Mars", "Jupiter", "Saturn"],
-            "correct_index": 1,
-            "explanation": "Mars is referred to as the Red Planet due to the iron oxide (rust) on its surface, which gives it a reddish appearance."
+            "question": "كم عدد أيام الأسبوع؟",
+            "choices": ["خمسة", "ستة", "سبعة", "ثمانية"],
+            "correct_index": 2,
+            "explanation": "الأسبوع يتكون من سبعة أيام."
         },
         {
-            "question": "What is the chemical symbol for water?",
+            "question": "ما هو أكبر كوكب في المجموعة الشمسية؟",
+            "choices": ["زحل", "المريخ", "المشتري", "أورانوس"],
+            "correct_index": 2,
+            "explanation": "المشتري هو أكبر كوكب في المجموعة الشمسية."
+        },
+        {
+            "question": "ما هو عنصر الماء الكيميائي؟",
             "choices": ["CO2", "H2O", "NaCl", "O2"],
             "correct_index": 1,
-            "explanation": "Water is composed of two hydrogen atoms bonded to one oxygen atom, represented as H2O."
+            "explanation": "الماء يتكون من ذرتي هيدروجين وذرة أكسجين ويُرمز له بـ H2O."
         },
         {
-            "question": "Who wrote the play 'Romeo and Juliet'?",
-            "choices": ["Charles Dickens", "William Shakespeare", "Mark Twain", "Jane Austen"],
-            "correct_index": 1,
-            "explanation": "William Shakespeare wrote the famous tragedy 'Romeo and Juliet' in the late 16th century."
-        },
-        {
-            "question": "Which of the following is a prime number?",
-            "choices": ["4", "9", "13", "15"],
+            "question": "أي من الآتي يعتبر مصدرًا للطاقة المتجددة؟",
+            "choices": ["الفحم الحجري", "البترول", "الطاقة الشمسية", "الغاز الطبيعي"],
             "correct_index": 2,
-            "explanation": "A prime number is only divisible by 1 and itself. 13 has no other factors, unlike 4, 9, and 15."
+            "explanation": "الطاقة الشمسية مصدر متجدد لأنها مستمدة من الشمس التي لا تنضب."
         }
     ],
     "Medium": [
         {
-            "question": "What is the term for the process by which plants convert sunlight into chemical energy?",
-            "choices": ["Respiration", "Photosynthesis", "Fermentation", "Transpiration"],
+            "question": "ما العملية التي تستخدمها النباتات لتحويل ضوء الشمس إلى طاقة كيميائية؟",
+            "choices": ["التنفس الخلوي", "التمثيل الضوئي", "التخمر", "النتح"],
             "correct_index": 1,
-            "explanation": "Photosynthesis is the process used by plants, algae, and certain bacteria to harness energy from sunlight and turn it into chemical energy."
+            "explanation": "التمثيل الضوئي هو العملية التي تستخدم فيها النباتات ضوء الشمس وثاني أكسيد الكربون والماء لإنتاج الغلوكوز والأكسجين."
         },
         {
-            "question": "Which gas is the most abundant in Earth's atmosphere?",
-            "choices": ["Oxygen", "Carbon Dioxide", "Nitrogen", "Argon"],
+            "question": "ما أكثر الغازات وفرةً في الغلاف الجوي للأرض؟",
+            "choices": ["الأكسجين", "ثاني أكسيد الكربون", "النيتروجين", "الأرجون"],
             "correct_index": 2,
-            "explanation": "Nitrogen makes up approximately 78% of the Earth's atmosphere, followed by oxygen at 21%."
+            "explanation": "يشكّل النيتروجين حوالي 78% من الغلاف الجوي للأرض."
         },
         {
-            "question": "In computer science, what does 'CPU' stand for?",
-            "choices": ["Computer Processing Unit", "Central Processing Unit", "Core Processing Utility", "Central Power Unit"],
-            "correct_index": 1,
-            "explanation": "CPU stands for Central Processing Unit. It is the primary component of a computer that performs instructions of a computer program."
-        },
-        {
-            "question": "Which historical document was signed in 1215 and limited the power of the English monarchy?",
-            "choices": ["The Declaration of Independence", "The Magna Carta", "The Bill of Rights", "The Treaty of Versailles"],
-            "correct_index": 1,
-            "explanation": "The Magna Carta ('Great Charter') was signed by King John in 1215, establishing the principle that everyone, including the king, is subject to the law."
-        },
-        {
-            "question": "What is the speed of light in a vacuum, approximately?",
-            "choices": ["300,000 km/s", "150,000 km/s", "1,000,000 km/s", "30,000 km/s"],
+            "question": "ما الذي يرمز إليه اختصار DNA؟",
+            "choices": ["حمض الديوكسي ريبونيوكليك", "حمض الريبونيوكليك", "بروتين النيوكليوتيد", "جزيء الكروموسوم"],
             "correct_index": 0,
-            "explanation": "The speed of light in a vacuum is approximately 299,792 kilometers per second (commonly rounded to 300,000 km/s)."
+            "explanation": "DNA هو اختصار لحمض الديوكسي ريبونيوكليك، وهو الجزيء الحامل للمعلومات الوراثية."
+        },
+        {
+            "question": "في علم الحاسوب، ماذا تعني كلمة CPU؟",
+            "choices": ["وحدة معالجة الحاسوب", "وحدة المعالجة المركزية", "نواة المعالجة الفردية", "وحدة الطاقة المركزية"],
+            "correct_index": 1,
+            "explanation": "CPU تعني وحدة المعالجة المركزية، وهي المكوّن الرئيسي الذي ينفّذ تعليمات البرنامج."
+        },
+        {
+            "question": "كم تبلغ سرعة الضوء في الفراغ تقريبًا؟",
+            "choices": ["300,000 كم/ث", "150,000 كم/ث", "1,000,000 كم/ث", "30,000 كم/ث"],
+            "correct_index": 0,
+            "explanation": "سرعة الضوء في الفراغ تبلغ تقريبًا 299,792 كيلومترًا في الثانية."
         }
     ],
     "Hard": [
         {
-            "question": "Which subatomic particle is not composed of quarks?",
-            "choices": ["Proton", "Neutron", "Electron", "Baryon"],
+            "question": "أي الجسيمات دون الذرية لا تتكون من كواركات؟",
+            "choices": ["البروتون", "النيوترون", "الإلكترون", "الباريون"],
             "correct_index": 2,
-            "explanation": "Electrons are leptons, which are fundamental particles. Protons and neutrons are baryons and are composed of quarks."
+            "explanation": "الإلكترونات من الليبتونات وهي جسيمات أساسية، بينما البروتونات والنيوترونات تتكون من كواركات."
         },
         {
-            "question": "In what year did the Western Roman Empire officially fall?",
-            "choices": ["325 AD", "476 AD", "1453 AD", "1066 AD"],
-            "correct_index": 1,
-            "explanation": "The Western Roman Empire fell in 476 AD when Romulus Augustulus was deposed by Odoacer, a Germanic chieftain."
-        },
-        {
-            "question": "What is the function of the enzyme 'Amylase' in human digestion?",
-            "choices": ["To digest proteins", "To digest lipids", "To break down starches into sugars", "To emulsify fats"],
+            "question": "ما وظيفة إنزيم الأميليز في الجهاز الهضمي البشري؟",
+            "choices": ["هضم البروتينات", "هضم الدهون", "تحليل النشا إلى سكريات", "استحلاب الدهون"],
             "correct_index": 2,
-            "explanation": "Amylase, present in saliva and pancreatic juice, catalyzes the breakdown of starch into simpler sugars like maltose."
+            "explanation": "الأميليز الموجود في اللعاب وعصير البنكرياس يحلّل النشا إلى سكريات أبسط كالمالتوز."
         },
         {
-            "question": "Which programming language paradigm is centered on 'objects' that contain both data and methods?",
-            "choices": ["Functional Programming", "Object-Oriented Programming", "Procedural Programming", "Logical Programming"],
+            "question": "في الرياضيات، ما المصطلح الذي يصف التطبيق الذي يحافظ على عمليتَي الجمع والضرب بين البنى الجبرية؟",
+            "choices": ["التماثل التوبولوجي", "التشاكل", "التماثل الذاتي", "التشاكل الجزئي"],
             "correct_index": 1,
-            "explanation": "Object-Oriented Programming (OOP) is a paradigm based on the concept of 'objects', which can contain data (attributes) and code (methods)."
+            "explanation": "التشاكل (Homomorphism) هو تطبيق بين بنيتين جبريتين من نفس النوع يحافظ على عملياتهما."
         },
         {
-            "question": "What is the mathematical term for a mapping that preserves the operations of addition and multiplication between algebraic structures?",
-            "choices": ["Homeomorphism", "Isomorphism", "Automorphism", "Homomorphism"],
-            "correct_index": 3,
-            "explanation": "A homomorphism is a map between two algebraic structures of the same type (like groups or rings) that preserves the operations."
+            "question": "ما الحدث الذي أشعل فتيل الحرب العالمية الأولى عام 1914م؟",
+            "choices": ["غزو بولندا", "اغتيال الأرشيدوق فرانز فرديناند", "غرق سفينة لوزيتانيا", "توقيع معاهدة فرساي"],
+            "correct_index": 1,
+            "explanation": "أشعل اغتيال ولي عهد النمسا-المجر الأرشيدوق فرانز فرديناند في سراييفو فتيل الحرب العالمية الأولى."
+        },
+        {
+            "question": "ما نموذج البرمجة الذي يمثّل البيانات والوظائف معًا داخل كيانات تُسمى 'كائنات'؟",
+            "choices": ["البرمجة الوظيفية", "البرمجة كائنية التوجه", "البرمجة الإجرائية", "البرمجة المنطقية"],
+            "correct_index": 1,
+            "explanation": "البرمجة كائنية التوجه (OOP) تعتمد على كائنات تجمع البيانات والوظائف معًا."
         }
     ]
 }
 
+
+# ---------------------------------------------------------------------------
+# PDF text extraction — pdfminer (Arabic-aware) with pypdf fallback
+# ---------------------------------------------------------------------------
+
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract all text contents from a PDF file."""
+    """Extract all text from a PDF file, with special handling for Arabic.
+    
+    Strategy:
+      1. Try pdfminer.six — best Unicode / Arabic glyph support
+      2. Fall back to pypdf if pdfminer fails
+      3. Post-process with arabic_reshaper + python-bidi if Arabic detected
+    """
+    text = _extract_with_pdfminer(pdf_path)
+    if not text:
+        text = _extract_with_pypdf(pdf_path)
+
+    if text and _is_arabic_text(text):
+        text = _reshape_arabic(text)
+
+    return text.strip()
+
+
+def _extract_with_pdfminer(pdf_path: str) -> str:
+    """Use pdfminer.six for robust Unicode / Arabic extraction."""
     try:
+        from pdfminer.high_level import extract_text as pdfminer_extract
+        text = pdfminer_extract(pdf_path)
+        return text or ""
+    except Exception as e:
+        print(f"[pdfminer] Failed on {pdf_path}: {e}")
+        return ""
+
+
+def _extract_with_pypdf(pdf_path: str) -> str:
+    """Fallback: use pypdf for text extraction."""
+    try:
+        from pypdf import PdfReader
         reader = PdfReader(pdf_path)
         text = ""
         for page in reader.pages:
             page_text = page.extract_text()
             if page_text:
                 text += page_text + "\n"
-        return text.strip()
+        return text
     except Exception as e:
-        print(f"Error reading PDF {pdf_path}: {e}")
+        print(f"[pypdf] Failed on {pdf_path}: {e}")
         return ""
 
+
+# ---------------------------------------------------------------------------
+# Local heuristic quiz generator (Arabic + English)
+# ---------------------------------------------------------------------------
+
 def parse_pdf_heuristically(text: str, count: int, difficulty: str) -> list:
-    """Analyze the text and extract dynamic questions based on definitions and key terms."""
+    """Extract quiz questions from PDF text using pattern matching.
+    Handles both Arabic and English content.
+    """
+    is_arabic = _is_arabic_text(text)
     questions = []
-    
-    # 1. Clean and normalize text
+
+    # Clean and normalise whitespace
     text = re.sub(r'\s+', ' ', text)
-    
-    # 2. Extract potential definitions: 'A [Noun] is [definition]' or '[Noun] refers to [definition]'
-    # Let's search for keywords
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    
+
+    if is_arabic:
+        questions = _heuristic_arabic(text, count)
+    else:
+        questions = _heuristic_english(text, count)
+
+    # Shuffle and pad with fallback bank if needed
+    random.shuffle(questions)
+    selected = questions[:count]
+
+    needed = count - len(selected)
+    if needed > 0:
+        bank = DEFAULT_QUESTION_BANK.get(difficulty, DEFAULT_QUESTION_BANK["Medium"])
+        bank_copy = list(bank)
+        random.shuffle(bank_copy)
+        selected += bank_copy[:needed]
+
+    return selected[:count]
+
+
+def _heuristic_arabic(text: str, count: int) -> list:
+    """Heuristic question extraction for Arabic text."""
+    questions = []
+
+    # Split on Arabic sentence endings
+    sentences = re.split(r'[.،؟!]\s+', text)
+
     definitions = []
     fill_blanks = []
-    
-    # Filter and find interesting sentences
+
+    for sent in sentences:
+        sent = sent.strip()
+        if len(sent) < 20 or len(sent) > 300:
+            continue
+
+        # Arabic definition pattern: "X هو/هي/يعني/تعني ..."
+        match = re.search(
+            r'([\u0600-\u06FF\s]{3,30})\s+(هو|هي|يعني|تعني|يُعرَّف بأنه|تُعرَّف بأنها|يُعرَّف|هي عبارة عن|هو عبارة عن)\s+([\u0600-\u06FF\s،]{10,120})',
+            sent
+        )
+        if match:
+            term = match.group(1).strip()
+            meaning = match.group(3).strip()
+            if term and meaning:
+                definitions.append({"term": term, "definition": meaning, "sentence": sent})
+                continue
+
+        # Fill-in-the-blank: pick a meaningful Arabic word (4+ letters)
+        match_cloze = re.search(r'\b([\u0600-\u06FF]{4,15})\b', sent)
+        if match_cloze:
+            kw = match_cloze.group(1)
+            blanked = sent.replace(kw, "_____", 1)
+            fill_blanks.append({"keyword": kw, "blanked": blanked, "sentence": sent})
+
+    # Build definition questions
+    for d in definitions:
+        q_text = f"وفقًا للمادة الدراسية، ما هو تعريف أو دور '{d['term']}'؟"
+        correct_choice = d['definition']
+        other_meanings = [x['definition'] for x in definitions if x['term'] != d['term']]
+        if len(other_meanings) < 3:
+            other_meanings += [
+                "حالة مؤقتة من التوازن الكيميائي الحيوي.",
+                "أسلوب تحليلي يُستخدم لحساب المتغيرات في النظام.",
+                "بروتوكول أساسي طُوِّر لمعايير الأمان.",
+                "العنصر الجوهري للبنية التحتية للنظام."
+            ]
+        choices = [correct_choice] + random.sample(other_meanings, 3)
+        random.shuffle(choices)
+        correct_idx = choices.index(correct_choice)
+        questions.append({
+            "question": q_text,
+            "choices": [c[:120] + "..." if len(c) > 120 else c for c in choices],
+            "correct_index": correct_idx,
+            "explanation": f"استنادًا إلى النص: \"{d['sentence']}\""
+        })
+
+    # Build fill-in-the-blank questions
+    for fb in fill_blanks:
+        q_text = f"أكمل الفراغ: \"{fb['blanked']}\""
+        correct_choice = fb['keyword']
+        other_kws = list(set(x['keyword'] for x in fill_blanks if x['keyword'] != fb['keyword']))
+        if len(other_kws) < 3:
+            other_kws += ["مفهوم", "تحليل", "نظرية", "متغير", "معامل"]
+        choices = [correct_choice] + random.sample(other_kws, 3)
+        random.shuffle(choices)
+        correct_idx = choices.index(correct_choice)
+        questions.append({
+            "question": q_text,
+            "choices": choices[:4],
+            "correct_index": correct_idx,
+            "explanation": f"الجملة الكاملة: \"{fb['sentence']}\""
+        })
+
+    return questions
+
+
+def _heuristic_english(text: str, count: int) -> list:
+    """Heuristic question extraction for English text."""
+    questions = []
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    definitions = []
+    fill_blanks = []
+
     for sent in sentences:
         sent = sent.strip()
         if len(sent) < 30 or len(sent) > 200:
             continue
-            
-        # Match definitions
-        # Pattern like: "Mitosis is a process of..."
-        match = re.search(r'\b([A-Z][a-zA-Z0-9\s-]{2,25})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]+)', sent)
+
+        match = re.search(
+            r'\b([A-Z][a-zA-Z0-9\s-]{2,25})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]+)',
+            sent
+        )
         if match:
             term = match.group(1).strip()
             meaning = match.group(3).strip()
-            # Ignore common pronouns/generic words
             if term.lower() not in ["it", "this", "they", "there", "these", "that", "which"]:
-                definitions.append({
-                    "term": term,
-                    "definition": meaning,
-                    "sentence": sent
-                })
+                definitions.append({"term": term, "definition": meaning, "sentence": sent})
                 continue
-                
-        # If not a definition, look for potential cloze/fill in the blanks
-        # Find capitalized nouns/terms that we can blank out
+
         match_cloze = re.search(r'\b([A-Z][a-zA-Z0-9-]{3,15})\b', sent)
         if match_cloze:
             kw = match_cloze.group(1)
-            # Find a sentence with this keyword and blank it out
             if kw.lower() not in ["the", "this", "that", "with", "from", "when", "what", "where", "whom"]:
                 blanked = sent.replace(kw, "_____")
-                fill_blanks.append({
-                    "keyword": kw,
-                    "blanked": blanked,
-                    "sentence": sent
-                })
-                
-    # Compile questions
-    all_extracted_questions = []
-    
-    # Process definitions
+                fill_blanks.append({"keyword": kw, "blanked": blanked, "sentence": sent})
+
     for d in definitions:
-        # Create a definition question: "What is [term]?" or "Which of the following best defines [term]?"
         q_text = f"According to the study material, what is the definition or role of '{d['term']}'?"
         correct_choice = d['definition']
-        
-        # Get distractors from other definitions or custom options
         other_meanings = [x['definition'] for x in definitions if x['term'] != d['term']]
         if len(other_meanings) < 3:
             other_meanings += [
@@ -186,161 +337,146 @@ def parse_pdf_heuristically(text: str, count: int, difficulty: str) -> list:
                 "A foundational protocol developed for security standards.",
                 "The core element of system infrastructure."
             ]
-        
         choices = [correct_choice] + random.sample(other_meanings, 3)
         random.shuffle(choices)
         correct_idx = choices.index(correct_choice)
-        
-        all_extracted_questions.append({
+        questions.append({
             "question": q_text,
             "choices": [c[:100] + "..." if len(c) > 100 else c for c in choices],
             "correct_index": correct_idx,
             "explanation": f"Based on the text: \"{d['sentence']}\""
         })
-        
-    # Process fill-in-the-blanks
+
     for fb in fill_blanks:
         q_text = f"Fill in the blank: \"{fb['blanked']}\""
         correct_choice = fb['keyword']
-        
-        other_kws = [x['keyword'] for x in fill_blanks if x['keyword'] != fb['keyword']]
-        # Deduplicate
-        other_kws = list(set(other_kws))
+        other_kws = list(set(x['keyword'] for x in fill_blanks if x['keyword'] != fb['keyword']))
         if len(other_kws) < 3:
             other_kws += ["Hypothesis", "Synthesis", "Framework", "Variables", "Parameter"]
-            
         choices = [correct_choice] + random.sample(other_kws, 3)
         random.shuffle(choices)
         correct_idx = choices.index(correct_choice)
-        
-        all_extracted_questions.append({
+        questions.append({
             "question": q_text,
             "choices": choices[:4],
             "correct_index": correct_idx,
             "explanation": f"The full sentence is: \"{fb['sentence']}\""
         })
 
-    # Shuffle extracted questions
-    random.shuffle(all_extracted_questions)
-    
-    # Take what we can get
-    selected_questions = all_extracted_questions[:count]
-    
-    # If we don't have enough questions from the PDF, pad them using the default bank
-    needed = count - len(selected_questions)
-    if needed > 0:
-        bank = DEFAULT_QUESTION_BANK.get(difficulty, DEFAULT_QUESTION_BANK["Medium"])
-        # Avoid running out of bank questions
-        bank_copy = list(bank)
-        random.shuffle(bank_copy)
-        selected_questions += bank_copy[:needed]
-        
-    return selected_questions[:count]
+    return questions
+
+
+# ---------------------------------------------------------------------------
+# Gemini API quiz generator (Arabic + English aware)
+# ---------------------------------------------------------------------------
 
 def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: str) -> list:
-    """Generate quiz using Gemini API via standard Python urllib (no external dependencies)."""
-    # Truncate text if too long to fit in standard request safely (e.g. limit to first ~10000 words)
+    """Generate quiz using Gemini API. Instructs Gemini to use Arabic if the text is Arabic."""
+    is_arabic = _is_arabic_text(text)
     truncated_text = text[:40000]
-    
-    prompt = (
-        f"You are an expert AI educator. Generate a high-quality study quiz based on the following text.\n"
-        f"Generate exactly {count} multiple choice questions. Difficulty level: {difficulty}.\n"
-        f"Requirements:\n"
-        f"1. Return ONLY a valid JSON array of question objects. Do NOT wrap the JSON in ```json or any markdown formatting.\n"
-        f"2. Each question object must have exactly the following structure:\n"
-        f"   {{\n"
-        f"     \"question\": \"Question text here\",\n"
-        f"     \"choices\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n"
-        f"     \"correct_index\": integer index (0-3) of the correct choice,\n"
-        f"     \"explanation\": \"Brief explanation of why this answer is correct\"\n"
-        f"   }}\n"
-        f"Text:\n{truncated_text}"
-    )
-    
-    # Construct Gemini REST API URL
+
+    if is_arabic:
+        lang_instruction = (
+            "النص المقدم باللغة العربية. يجب أن تكون جميع الأسئلة والخيارات والشرح باللغة العربية الفصحى."
+        )
+        difficulty_ar = {"Easy": "سهل", "Medium": "متوسط", "Hard": "صعب"}.get(difficulty, "متوسط")
+        prompt = (
+            f"أنت خبير تعليمي. قم بإنشاء اختبار دراسي عالي الجودة بناءً على النص التالي.\n"
+            f"{lang_instruction}\n"
+            f"أنشئ بالضبط {count} سؤالاً من نوع الاختيار المتعدد. مستوى الصعوبة: {difficulty_ar}.\n"
+            f"المتطلبات:\n"
+            f"1. أعد فقط مصفوفة JSON صالحة من كائنات الأسئلة. لا تضع JSON داخل ```json أو أي تنسيق markdown.\n"
+            f"2. يجب أن يحتوي كل كائن سؤال على البنية التالية بالضبط:\n"
+            f"   {{\n"
+            f"     \"question\": \"نص السؤال هنا\",\n"
+            f"     \"choices\": [\"الخيار أ\", \"الخيار ب\", \"الخيار ج\", \"الخيار د\"],\n"
+            f"     \"correct_index\": رقم صحيح (0-3) يمثل فهرس الإجابة الصحيحة,\n"
+            f"     \"explanation\": \"شرح موجز لماذا هذه الإجابة صحيحة\"\n"
+            f"   }}\n"
+            f"النص:\n{truncated_text}"
+        )
+    else:
+        prompt = (
+            f"You are an expert AI educator. Generate a high-quality study quiz based on the following text.\n"
+            f"Generate exactly {count} multiple choice questions. Difficulty level: {difficulty}.\n"
+            f"Requirements:\n"
+            f"1. Return ONLY a valid JSON array of question objects. Do NOT wrap the JSON in ```json or any markdown formatting.\n"
+            f"2. Each question object must have exactly the following structure:\n"
+            f"   {{\n"
+            f"     \"question\": \"Question text here\",\n"
+            f"     \"choices\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n"
+            f"     \"correct_index\": integer index (0-3) of the correct choice,\n"
+            f"     \"explanation\": \"Brief explanation of why this answer is correct\"\n"
+            f"   }}\n"
+            f"Text:\n{truncated_text}"
+        )
+
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
-    headers = {
-        "Content-Type": "application/json"
-    }
-    
-    # Request body structure
+    headers = {"Content-Type": "application/json"}
     data = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt}
-                ]
-            }
-        ],
-        "generationConfig": {
-            "responseMimeType": "application/json"
-        }
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseMimeType": "application/json"}
     }
-    
     req_body = json.dumps(data).encode("utf-8")
-    
+
     try:
         req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=45) as response:
             res_data = json.loads(response.read().decode("utf-8"))
-            
-            # Extract text response from Gemini structure
-            text_response = res_data['candidates'][0]['content']['parts'][0]['text']
-            
-            # Clean possible markdown block wraps
-            text_response = text_response.strip()
+            text_response = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+
+            # Strip markdown code fences if present
             if text_response.startswith("```"):
-                # strip out ```json and ```
                 lines = text_response.splitlines()
                 if lines[0].startswith("```"):
                     lines = lines[1:]
-                if lines[-1].startswith("```"):
+                if lines and lines[-1].startswith("```"):
                     lines = lines[:-1]
                 text_response = "\n".join(lines).strip()
-                
+
             parsed_questions = json.loads(text_response)
-            
+
             if isinstance(parsed_questions, list) and len(parsed_questions) > 0:
-                # Basic validation
                 validated = []
                 for q in parsed_questions:
                     if "question" in q and "choices" in q and "correct_index" in q:
-                        # Ensure 4 choices
+                        none_label = "لا شيء مما سبق" if is_arabic else "None of the above"
                         while len(q["choices"]) < 4:
-                            q["choices"].append("None of the above")
+                            q["choices"].append(none_label)
                         q["choices"] = q["choices"][:4]
                         validated.append({
                             "question": q["question"],
                             "choices": q["choices"],
                             "correct_index": int(q["correct_index"]),
-                            "explanation": q.get("explanation", "Based on the text contents.")
+                            "explanation": q.get("explanation", "استناداً إلى محتوى النص." if is_arabic else "Based on the text contents.")
                         })
                 if validated:
                     return validated[:count]
-                    
+
     except Exception as e:
-        print(f"Failed to generate quiz via Gemini API: {e}. Falling back to local heuristic generator.")
-        
-    # Fallback to heuristic
+        print(f"Gemini API failed: {e}. Falling back to local heuristic generator.")
+
     return parse_pdf_heuristically(text, count, difficulty)
 
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
 def generate_quiz(pdf_path: str, count: int, difficulty: str, api_key: str = None) -> list:
-    """Main function to generate a quiz from a PDF file path."""
+    """Generate a quiz from a PDF file (or general knowledge if no file given)."""
     text = ""
     if pdf_path:
         text = extract_text_from_pdf(pdf_path)
-        
+
     if not text:
-        # Fall back directly to default question bank if no text found or no file uploaded
         bank = DEFAULT_QUESTION_BANK.get(difficulty, DEFAULT_QUESTION_BANK["Medium"])
         bank_copy = list(bank)
         random.shuffle(bank_copy)
-        # Pad if count is higher than bank size
         while len(bank_copy) < count:
             bank_copy += bank_copy
         return bank_copy[:count]
-        
+
     if api_key:
         return generate_quiz_via_gemini(text, count, difficulty, api_key)
     else:

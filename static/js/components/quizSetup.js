@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Dafoor AI - Quiz Setup Component (Vanilla JS)
+   Dafoor AI - Quiz Setup Component (Vanilla JS) — Arabic UI
    ========================================================================== */
 
 export async function renderQuizSetup(container, app) {
@@ -11,7 +11,7 @@ export async function renderQuizSetup(container, app) {
             pdfs = await app.apiFetch('/api/pdfs');
             app.state.pdfs = pdfs;
         } catch (err) {
-            console.error("Failed to load PDFs in setup:", err);
+            console.error("فشل تحميل ملفات PDF في الإعداد:", err);
         }
     }
 
@@ -25,40 +25,40 @@ export async function renderQuizSetup(container, app) {
             <div class="setup-container">
                 <div class="card">
                     <div class="auth-header" style="text-align: center;">
-                        <h2>Configure Study Quiz</h2>
-                        <p>Customize the AI engine settings to match your study goals</p>
+                        <h2>إعداد الاختبار الدراسي</h2>
+                        <p>خصّص إعدادات محرك الذكاء الاصطناعي لتناسب أهدافك الدراسية</p>
                     </div>
                     
                     <form id="quiz-config-form">
                         <!-- Source Document Dropdown -->
                         <div class="form-group">
-                            <label class="form-label" for="pdf-select">Select Study Source</label>
+                            <label class="form-label" for="pdf-select">اختر المصدر الدراسي</label>
                             <select id="pdf-select" class="form-input" style="background-image: none; appearance: auto;">
-                                ${pdfs.length > 0 ? '' : '<option value="">None - Fallback to General Knowledge</option>'}
+                                ${pdfs.length > 0 ? '' : '<option value="">بدون مستند — أسئلة معرفة عامة</option>'}
                                 ${pdfs.map(pdf => `
                                     <option value="${pdf.id}" ${pdf.id === selectedPdfId ? 'selected' : ''}>
                                         ${pdf.filename}
                                     </option>
                                 `).join('')}
-                                ${pdfs.length > 0 ? '<option value="">General Knowledge (No Document)</option>' : ''}
+                                ${pdfs.length > 0 ? '<option value="">معرفة عامة (بدون مستند)</option>' : ''}
                             </select>
                         </div>
                         
                         <!-- Difficulty Tabs -->
                         <div class="form-group">
-                            <label class="form-label">Difficulty Level</label>
+                            <label class="form-label">مستوى الصعوبة</label>
                             <div class="tabs">
-                                <button type="button" class="tab-btn ${selectedDifficulty === 'Easy' ? 'active' : ''}" data-val="Easy">Easy</button>
-                                <button type="button" class="tab-btn ${selectedDifficulty === 'Medium' ? 'active' : ''}" data-val="Medium">Medium</button>
-                                <button type="button" class="tab-btn ${selectedDifficulty === 'Hard' ? 'active' : ''}" data-val="Hard">Hard</button>
+                                <button type="button" class="tab-btn ${selectedDifficulty === 'Easy' ? 'active' : ''}" data-val="Easy">سهل</button>
+                                <button type="button" class="tab-btn ${selectedDifficulty === 'Medium' ? 'active' : ''}" data-val="Medium">متوسط</button>
+                                <button type="button" class="tab-btn ${selectedDifficulty === 'Hard' ? 'active' : ''}" data-val="Hard">صعب</button>
                             </div>
                         </div>
 
                         <!-- Question Count Slider -->
                         <div class="slider-container">
                             <div class="slider-header">
-                                <span>Question Count</span>
-                                <span class="slider-val" id="q-count-val">${questionCount} Questions</span>
+                                <span>عدد الأسئلة</span>
+                                <span class="slider-val" id="q-count-val">${questionCount} سؤالاً</span>
                             </div>
                             <input 
                                 type="range" 
@@ -74,8 +74,8 @@ export async function renderQuizSetup(container, app) {
                         <!-- Timer Slider -->
                         <div class="slider-container">
                             <div class="slider-header">
-                                <span>Time Limit</span>
-                                <span class="slider-val" id="timer-val">${timeLimit} Minutes</span>
+                                <span>الوقت المحدد</span>
+                                <span class="slider-val" id="timer-val">${timeLimit} دقيقة</span>
                             </div>
                             <input 
                                 type="range" 
@@ -90,7 +90,7 @@ export async function renderQuizSetup(container, app) {
 
                         <!-- CTA Button -->
                         <button type="submit" id="generate-btn" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Study Quiz
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> توليد الاختبار الدراسي
                         </button>
                     </form>
                 </div>
@@ -127,13 +127,13 @@ export async function renderQuizSetup(container, app) {
         // Question count slider
         qCountInput.addEventListener('input', () => {
             questionCount = parseInt(qCountInput.value);
-            qCountVal.innerText = `${questionCount} Questions`;
+            qCountVal.innerText = `${questionCount} سؤالاً`;
         });
 
         // Timer slider
         timerInput.addEventListener('input', () => {
             timeLimit = parseInt(timerInput.value);
-            timerVal.innerText = `${timeLimit} Minutes`;
+            timerVal.innerText = `${timeLimit} دقيقة`;
         });
 
         // Submit form
@@ -142,14 +142,14 @@ export async function renderQuizSetup(container, app) {
             
             // Set dynamic loading visual state sequence
             generateBtn.disabled = true;
-            generateBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Initializing AI Engine...';
+            generateBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جارٍ تهيئة محرك الذكاء الاصطناعي...';
             
             const loadingMessages = [
-                "Scanning PDF text nodes...",
-                "Tokenizing key concepts...",
-                "Drafting context definitions...",
-                "Formulating distractors...",
-                "Assembling quiz interface..."
+                "جارٍ مسح نصوص PDF...",
+                "تحليل المفاهيم الأساسية...",
+                "صياغة التعريفات السياقية...",
+                "إعداد الخيارات البديلة...",
+                "تجميع واجهة الاختبار..."
             ];
 
             let messageIndex = 0;
@@ -173,15 +173,15 @@ export async function renderQuizSetup(container, app) {
                 });
 
                 clearInterval(messageInterval);
-                app.showToast("Quiz generated successfully! Starting now...", 'success');
+                app.showToast("تم توليد الاختبار بنجاح! يبدأ الآن...", 'success');
                 
                 // Route to active quiz with payload
                 app.navigateTo('quiz-active', response);
             } catch (err) {
                 clearInterval(messageInterval);
-                app.showToast("Failed to generate quiz: " + err.message, 'error');
+                app.showToast("فشل توليد الاختبار: " + err.message, 'error');
                 generateBtn.disabled = false;
-                generateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Generate Study Quiz';
+                generateBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> توليد الاختبار الدراسي';
             }
         });
     }

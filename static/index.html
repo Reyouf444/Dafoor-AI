@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dafoor AI - Elevate Your Learning</title>
+    <title>دفور AI - ارتقِ بمستواك الدراسي</title>
+    <meta name="description" content="دفور AI - منصة تعلّم ذكية تولّد اختبارات تفاعلية من ملفات PDF باللغة العربية والإنجليزية.">
     <meta name="author" content="Reyouf Alfawzan">
-    <!-- Google Fonts: Outfit -->
+    <!-- Google Fonts: Noto Kufi Arabic (RTL) + Outfit (LTR fallback) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <!-- Lottie Web Player Library -->
@@ -25,23 +26,23 @@
                 <div class="logo">
                     <!-- Dynamic Navbar Icon Animation -->
                     <div id="logo-animation-nav" style="width: 40px; height: 40px;"></div>
-                    <span>Dafoor AI</span>
+                    <span>دفور AI</span>
                 </div>
                 <nav class="nav-links">
                     <a href="#dashboard" id="nav-dashboard" class="nav-item active">
-                        <i class="fa-solid fa-chart-pie"></i> Dashboard
+                        <i class="fa-solid fa-chart-pie"></i> لوحة التحكم
                     </a>
                     <a href="#quiz-setup" id="nav-quiz-setup" class="nav-item">
-                        <i class="fa-solid fa-sliders"></i> Practice
+                        <i class="fa-solid fa-sliders"></i> تدريب
                     </a>
                     <a href="#analytics" id="nav-analytics" class="nav-item">
-                        <i class="fa-solid fa-chart-line"></i> Analytics
+                        <i class="fa-solid fa-chart-line"></i> الإحصائيات
                     </a>
                 </nav>
                 <div class="user-menu">
-                    <span id="user-display"><i class="fa-regular fa-circle-user"></i> Guest</span>
+                    <span id="user-display"><i class="fa-regular fa-circle-user"></i> ضيف</span>
                     <button id="logout-btn" class="btn btn-secondary">
-                        <i class="fa-solid fa-right-from-bracket"></i> Logout
+                        <i class="fa-solid fa-right-from-bracket"></i> تسجيل الخروج
                     </button>
                 </div>
             </div>
@@ -58,13 +59,13 @@
         <!-- Global Floating Toast Notification -->
         <div id="toast-container"></div>
 
-        <!-- Footer containing Author Rebrand Tag -->
+        <!-- Footer -->
         <footer id="app-footer" style="text-align: center; padding: 24px 0; color: #4b5563; font-size: 0.85rem; border-top: 1px solid var(--border-color); margin-top: auto; width: 100%;">
-            <p>Created by Reyouf Alfawzan • Powered by Dafoor AI</p>
+            <p>صُنع بواسطة ريوف الفوزان • مدعوم من دفور AI</p>
         </footer>
     </div>
 
-    <!-- pdf-lib: client-side PDF manipulation (used by PDF Splitter) -->
+    <!-- pdf-lib: client-side PDF manipulation -->
     <script type="importmap">
     {
         "imports": {

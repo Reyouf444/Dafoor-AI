@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Dafoor AI - Auth Page Component (Vanilla JS)
+   Dafoor AI - Auth Page Component (Vanilla JS) — Arabic UI
    ========================================================================== */
 
 export function renderAuth(container, app) {
@@ -12,25 +12,25 @@ export function renderAuth(container, app) {
                     <!-- Dynamic Lottie Logo Animation -->
                     <div id="logo-animation" style="width: 80px; height: 80px; margin: 0 auto 16px auto;"></div>
                     <div class="auth-header">
-                        <h2>${isLoginMode ? 'Welcome Back' : 'Get Started'}</h2>
-                        <p>${isLoginMode ? 'Access your Dafoor AI account' : 'Create an account to start studying smarter'}</p>
+                        <h2>${isLoginMode ? 'مرحبًا بعودتك' : 'ابدأ الآن'}</h2>
+                        <p>${isLoginMode ? 'ادخل إلى حسابك في دفور AI' : 'أنشئ حسابًا لتبدأ الدراسة بذكاء'}</p>
                     </div>
                     
                     <form id="auth-form">
                         <div class="form-group">
-                            <label class="form-label" for="username">Username</label>
+                            <label class="form-label" for="username">اسم المستخدم</label>
                             <input 
                                 type="text" 
                                 id="username" 
                                 class="form-input" 
-                                placeholder="Enter your username" 
+                                placeholder="أدخل اسم المستخدم" 
                                 required 
                                 minlength="3"
                                 autocomplete="username"
                             />
                         </div>
                         <div class="form-group">
-                            <label class="form-label" for="password">Password</label>
+                            <label class="form-label" for="password">كلمة المرور</label>
                             <input 
                                 type="password" 
                                 id="password" 
@@ -43,15 +43,15 @@ export function renderAuth(container, app) {
                         </div>
                         
                         <button type="submit" id="auth-submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
-                            ${isLoginMode ? '<i class="fa-solid fa-right-to-bracket"></i> Login' : '<i class="fa-solid fa-user-plus"></i> Sign Up'}
+                            ${isLoginMode ? '<i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول' : '<i class="fa-solid fa-user-plus"></i> إنشاء حساب'}
                         </button>
                     </form>
                     
                     <div class="auth-toggle-msg">
                         <p>
-                            ${isLoginMode ? "Don't have an account?" : "Already have an account?"} 
+                            ${isLoginMode ? 'ليس لديك حساب؟' : 'لديك حساب بالفعل؟'} 
                             <a href="#" id="auth-toggle-link" style="font-weight: 600;">
-                                ${isLoginMode ? 'Create one' : 'Login instead'}
+                                ${isLoginMode ? 'أنشئ حسابًا' : 'تسجيل الدخول'}
                             </a>
                         </p>
                     </div>
@@ -93,7 +93,7 @@ export function renderAuth(container, app) {
             const password = document.getElementById('password').value;
 
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing...';
+            submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> جارٍ المعالجة...';
 
             const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/signup';
             
@@ -104,7 +104,7 @@ export function renderAuth(container, app) {
                 });
                 
                 app.showToast(
-                    isLoginMode ? 'Logged in successfully!' : 'Account registered and logged in!', 
+                    isLoginMode ? 'تم تسجيل الدخول بنجاح!' : 'تم إنشاء الحساب وتسجيل الدخول!', 
                     'success'
                 );
                 
@@ -113,8 +113,8 @@ export function renderAuth(container, app) {
                 app.showToast(err.message, 'error');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = isLoginMode 
-                    ? '<i class="fa-solid fa-right-to-bracket"></i> Login' 
-                    : '<i class="fa-solid fa-user-plus"></i> Sign Up';
+                    ? '<i class="fa-solid fa-right-to-bracket"></i> تسجيل الدخول' 
+                    : '<i class="fa-solid fa-user-plus"></i> إنشاء حساب';
             }
         });
     }
