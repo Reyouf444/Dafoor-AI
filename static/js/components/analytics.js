@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Dafoor AI - Analytics Component (Vanilla JS) — Arabic UI
+   Dafoor AI - Analytics Component (Vanilla JS)
    ========================================================================== */
 
 export async function renderAnalytics(container, app) {
@@ -8,11 +8,11 @@ export async function renderAnalytics(container, app) {
     try {
         analyticsData = await app.apiFetch('/api/analytics');
     } catch (err) {
-        app.showToast("فشل تحميل الإحصائيات: " + err.message, 'error');
+        app.showToast("Failed to fetch analytics: " + err.message, 'error');
         container.innerHTML = `
             <div class="card" style="text-align: center;">
-                <h2>خطأ في الإحصائيات</h2>
-                <p>فشل استرجاع سجل الدرجات: ${err.message}</p>
+                <h2>Analytics Error</h2>
+                <p>Failed to retrieve score history: ${err.message}</p>
             </div>
         `;
         return;
@@ -21,14 +21,14 @@ export async function renderAnalytics(container, app) {
     const { summary, history } = analyticsData;
 
     function formatTime(seconds) {
-        if (!seconds) return '0د';
+        if (!seconds) return '0m';
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
         const s = seconds % 60;
         
-        if (h > 0) return `${h}س ${m}د`;
-        if (m > 0) return `${m}د ${s}ث`;
-        return `${s}ث`;
+        if (h > 0) return `${h}h ${m}m`;
+        if (m > 0) return `${m}m ${s}s`;
+        return `${s}s`;
     }
 
     function draw() {
@@ -39,21 +39,21 @@ export async function renderAnalytics(container, app) {
                     <div class="stat-card">
                         <div class="stat-icon"><i class="fa-solid fa-graduation-cap"></i></div>
                         <div class="stat-info">
-                            <span class="stat-label">الاختبارات المُنجزة</span>
+                            <span class="stat-label">Quizzes Taken</span>
                             <div class="stat-val">${summary.total_quizzes}</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon green"><i class="fa-solid fa-square-poll-vertical"></i></div>
                         <div class="stat-info">
-                            <span class="stat-label">متوسط الدرجات</span>
+                            <span class="stat-label">Average Score</span>
                             <div class="stat-val">${summary.avg_score}%</div>
                         </div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon blue"><i class="fa-solid fa-stopwatch"></i></div>
                         <div class="stat-info">
-                            <span class="stat-label">إجمالي وقت الدراسة</span>
+                            <span class="stat-label">Total Study Time</span>
                             <div class="stat-val">${formatTime(summary.total_time_seconds)}</div>
                         </div>
                     </div>
@@ -62,8 +62,8 @@ export async function renderAnalytics(container, app) {
                 <!-- Custom Interactive SVG Progress Chart -->
                 <div class="card chart-card">
                     <div class="chart-header">
-                        <h3><i class="fa-solid fa-chart-line"></i> سجل تقدم الدرجات</h3>
-                        <p style="font-size: 0.85rem; color: #6b7280;">خط زمني تفاعلي للتقدم</p>
+                        <h3><i class="fa-solid fa-chart-line"></i> Score Progress History</h3>
+                        <p style="font-size: 0.85rem; color: #6b7280;">Interactive progress timeline</p>
                     </div>
                     
                     <div class="svg-chart-container" id="chart-viewport">
@@ -74,7 +74,7 @@ export async function renderAnalytics(container, app) {
 
                 <!-- Detailed History Log Table -->
                 <div class="card">
-                    <h3 class="history-title"><i class="fa-solid fa-clock-rotate-left"></i> سجل جلسات التدريب</h3>
+                    <h3 class="history-title"><i class="fa-solid fa-clock-rotate-left"></i> Practice History Log</h3>
                     
                     <div class="history-list" id="history-log-container">
                         <!-- History items populated dynamically -->
@@ -95,7 +95,7 @@ export async function renderAnalytics(container, app) {
             viewport.innerHTML = `
                 <div class="pdf-empty" style="padding-top: 80px;">
                     <i class="fa-solid fa-chart-line" style="font-size: 3rem; margin-bottom: 12px; display: block; opacity: 0.3;"></i>
-                    لا توجد بيانات اختبارات بعد. أكمل جلسة تدريب لعرض الدرجات هنا!
+                    No quiz data available yet. Complete a quiz practice session to map scores!
                 </div>
             `;
             return;
@@ -133,11 +133,15 @@ export async function renderAnalytics(container, app) {
         let areaPath = "";
 
         if (points.length === 1) {
+            // For a single point, we draw a flat line across the middle of the chart
             const singleY = points[0].y;
             linePath = `M ${paddingLeft} ${singleY} L ${paddingLeft + chartWidth} ${singleY}`;
             areaPath = `M ${paddingLeft} ${singleY} L ${paddingLeft + chartWidth} ${singleY} L ${paddingLeft + chartWidth} ${paddingTop + chartHeight} L ${paddingLeft} ${paddingTop + chartHeight} Z`;
         } else {
+            // Multi-point coordinates
             linePath = `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+            
+            // Close path at bottom to fill gradient area
             areaPath = `${linePath} L ${points[points.length - 1].x} ${paddingTop + chartHeight} L ${points[0].x} ${paddingTop + chartHeight} Z`;
         }
 
@@ -155,6 +159,7 @@ export async function renderAnalytics(container, app) {
         let svgContent = `
             <svg viewBox="0 0 ${width} ${height}" class="chart-svg">
                 <defs>
+                    <!-- Gradients for styling -->
                     <linearGradient id="chart-gradient" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stop-color="#8b5cf6" />
                         <stop offset="100%" stop-color="#3b82f6" />
@@ -197,19 +202,20 @@ export async function renderAnalytics(container, app) {
             dot.addEventListener('mouseenter', (e) => {
                 const idx = parseInt(dot.getAttribute('data-idx'));
                 const pt = points[idx];
-                const dateStr = new Date(pt.data.attempted_at).toLocaleDateString('ar-SA');
+                const dateStr = new Date(pt.data.attempted_at).toLocaleDateString();
                 
                 tooltip.style.opacity = '1';
                 tooltip.innerHTML = `
                     <div class="tooltip-title">${pt.data.title}</div>
-                    <div style="font-size: 0.8rem; margin: 2px 0; color: #9ca3af;">التاريخ: ${dateStr}</div>
-                    <div class="tooltip-score">الدرجة: ${pt.data.score}%</div>
-                    <div style="font-size: 0.8rem; color: #9ca3af;">الوقت: ${formatTime(pt.data.time_spent_seconds)}</div>
+                    <div style="font-size: 0.8rem; margin: 2px 0; color: #9ca3af;">Date: ${dateStr}</div>
+                    <div class="tooltip-score">Score: ${pt.data.score}%</div>
+                    <div style="font-size: 0.8rem; color: #9ca3af;">Time: ${formatTime(pt.data.time_spent_seconds)}</div>
                 `;
 
                 // Position tooltip above the dot
                 const dotX = pt.x;
                 const dotY = pt.y;
+
                 tooltip.style.left = `${dotX - (tooltip.clientWidth / 2)}px`;
                 tooltip.style.top = `${dotY - tooltip.clientHeight - 12}px`;
             });
@@ -225,7 +231,7 @@ export async function renderAnalytics(container, app) {
         if (history.length === 0) {
             container.innerHTML = `
                 <div class="pdf-empty">
-                    لم تُكمل أي اختبارات بعد.
+                    No quizzes completed yet.
                 </div>
             `;
             return;
@@ -235,7 +241,7 @@ export async function renderAnalytics(container, app) {
         const sortedHistory = [...history].reverse();
 
         container.innerHTML = sortedHistory.map(item => {
-            const dateStr = new Date(item.attempted_at).toLocaleString('ar-SA');
+            const dateStr = new Date(item.attempted_at).toLocaleString();
             const passStatus = item.score >= 60;
             const scoreClass = passStatus ? '' : 'fail';
             
@@ -244,8 +250,8 @@ export async function renderAnalytics(container, app) {
                     <div class="history-info">
                         <div class="history-name">${item.title}</div>
                         <div class="history-meta">
-                            <span>التاريخ: ${dateStr}</span> • 
-                            <span>الوقت المستغرق: ${formatTime(item.time_spent_seconds)}</span>
+                            <span>Date: ${dateStr}</span> • 
+                            <span>Time spent: ${formatTime(item.time_spent_seconds)}</span>
                         </div>
                     </div>
                     <div class="history-score ${scoreClass}">

@@ -161,9 +161,9 @@ class App {
             console.error(`Error rendering view ${this.state.currentView}:`, err);
             this.container.innerHTML = `
                 <div class="card" style="text-align: center;">
-                    <h2>خطأ في عرض الصفحة</h2>
-                    <p style="margin: 16px 0;">حدث خطأ أثناء تحميل هذه الشاشة: ${err.message}</p>
-                    <button class="btn btn-primary" onclick="window.location.reload()">إعادة تحميل التطبيق</button>
+                    <h2>Rendering Error</h2>
+                    <p style="margin: 16px 0;">Something went wrong loading this screen: ${err.message}</p>
+                    <button class="btn btn-primary" onclick="window.location.reload()">Reload Application</button>
                 </div>
             `;
         }
@@ -192,7 +192,7 @@ class App {
         
         if (response.status === 401 && this.state.currentView !== 'auth') {
             this.logout();
-            throw new Error("انتهت الجلسة. يرجى تسجيل الدخول مجددًا.");
+            throw new Error("Session expired. Please log in again.");
         }
         
         const responseData = await response.json();
@@ -238,7 +238,7 @@ class App {
         try {
             await this.apiFetch('/api/auth/logout', { method: 'POST' });
         } catch (err) {
-            console.warn("طلب تسجيل الخروج فشل:", err);
+            console.warn("Logout request failed:", err);
         }
         
         this.state.token = null;

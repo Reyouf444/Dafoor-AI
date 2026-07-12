@@ -122,3 +122,34 @@ def delete_object(gcs_path: str) -> None:
         bucket.blob(gcs_path).delete()
     except Exception as exc:
         print(f"[GCS] Warning: could not delete {gcs_path}: {exc}")
+
+
+def download_to_temp(gcs_path: str) -> str:
+    """Download a GCS object to a temporary local file and return its path.
+
+    The caller is responsible for deleting the file when done:
+        import os; os.remove(tmp_path)
+
+    Args:
+        gcs_path: Object path inside the bucket (e.g. 'pdfs/1/uuid_file.pdf')
+
+    Returns:
+        Absolute path to the downloaded temp file (e.g. '/tmp/dafoor_<uuid>.pdf')
+    """
+    import tempfile
+    suffix = ".pdf" if gcs_path.lower().endswith(".pdf") else ""
+    tmp_fd, tmp_path = tempfile.mkstemp(prefix="dafoor_", suffix=suffix, dir="/tmp")
+    os.close(tmp_fd)  # close fd — blob.download_to_filename will open it
+
+    try:
+        blob = bucket.blob(gcs_path)
+        blob.download_to_filename(tmp_path)
+    except Exception as exc:
+        # Clean up and re-raise so callers get a clear error
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
+        raise RuntimeError(f"Failed to download {gcs_path} from GCS: {exc}") from exc
+
+    return tmp_path

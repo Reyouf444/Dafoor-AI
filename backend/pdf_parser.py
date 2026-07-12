@@ -460,14 +460,74 @@ def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: st
 
 
 # ---------------------------------------------------------------------------
+# Translation helper — Arabic text → English via Gemini
+# ---------------------------------------------------------------------------
+
+def translate_text_to_english(text: str, api_key: str) -> str:
+    """Translate Arabic text to English using the Gemini API.
+    
+    Falls back to the original text if the API call fails.
+    """
+    if not text or not _is_arabic_text(text):
+        return text  # Already English or empty
+    
+    truncated = text[:30000]  # Stay within token limits
+    prompt = (
+        "Translate the following Arabic text to clear, fluent English. "
+        "Return ONLY the translated text, no explanations or formatting.\n\n"
+        f"{truncated}"
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.1}
+    }
+    req_body = json.dumps(data).encode("utf-8")
+
+    try:
+        req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            translated = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+            print(f"[translate] Successfully translated {len(text)} chars to English.")
+            return translated
+    except Exception as e:
+        print(f"[translate] Translation failed: {e}. Using original text.")
+        return text  # Graceful fallback
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def generate_quiz(pdf_path: str, count: int, difficulty: str, api_key: str = None) -> list:
-    """Generate a quiz from a PDF file (or general knowledge if no file given)."""
-    text = ""
-    if pdf_path:
+def generate_quiz(
+    pdf_path: str,
+    count: int,
+    difficulty: str,
+    api_key: str = None,
+    language_mode: str = "auto",
+    pre_extracted_text: str = None
+) -> list:
+    """Generate a quiz from a PDF file (or general knowledge if no file given).
+    
+    Args:
+        pdf_path: Local path to a PDF file (already downloaded from GCS).
+        count: Number of questions to generate.
+        difficulty: 'Easy' | 'Medium' | 'Hard'
+        api_key: Optional Gemini API key for AI-powered generation.
+        language_mode: 'auto' | 'arabic' | 'translate' — controls question language.
+        pre_extracted_text: If provided, skips PDF reading and uses this text directly.
+                            Used when Arabic text has already been translated externally.
+    """
+    # Use pre-extracted text if supplied (e.g., already translated Arabic)
+    if pre_extracted_text:
+        text = pre_extracted_text
+    elif pdf_path:
         text = extract_text_from_pdf(pdf_path)
+    else:
+        text = ""
 
     if not text:
         bank = DEFAULT_QUESTION_BANK.get(difficulty, DEFAULT_QUESTION_BANK["Medium"])

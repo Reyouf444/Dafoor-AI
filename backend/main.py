@@ -10,8 +10,8 @@ from pydantic import BaseModel
 
 from backend.database import init_db, execute_write, execute_read_one, execute_read_all
 from backend.auth import hash_password, verify_password, create_session, verify_session, delete_session
-from backend.pdf_parser import generate_quiz
-from backend.storage import generate_upload_signed_url, get_public_url, delete_object
+from backend.pdf_parser import generate_quiz, extract_text_from_pdf, _is_arabic_text, translate_text_to_english
+from backend.storage import generate_upload_signed_url, get_public_url, delete_object, download_to_temp
 
 app = FastAPI(title="Dafoor AI")
 
@@ -229,6 +229,38 @@ class QuizGenRequest(BaseModel):
     difficulty: str
     time_limit: int
     gemini_api_key: Optional[str] = None
+    language_mode: Optional[str] = "auto"  # 'auto' | 'arabic' | 'translate'
+
+
+@app.get("/api/pdfs/{pdf_id}/language")
+def detect_pdf_language(
+    pdf_id: int,
+    user_id: int = Depends(get_current_user_id)
+):
+    """Download a PDF from GCS, extract text, and detect if it's Arabic."""
+    pdf = execute_read_one(
+        "SELECT * FROM pdfs WHERE id = ? AND user_id = ?",
+        (pdf_id, user_id)
+    )
+    if not pdf:
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    tmp_path = None
+    try:
+        tmp_path = download_to_temp(pdf["file_path"])
+        text = extract_text_from_pdf(tmp_path)
+        language = "arabic" if _is_arabic_text(text) else "english"
+        return {"language": language, "pdf_id": pdf_id}
+    except Exception as e:
+        # If we can't read it, default to english so no disruption
+        return {"language": "english", "pdf_id": pdf_id, "note": str(e)}
+    finally:
+        if tmp_path:
+            try:
+                import os as _os
+                _os.remove(tmp_path)
+            except Exception:
+                pass
 
 @app.post("/api/quizzes/generate")
 def generate_new_quiz(
@@ -249,12 +281,41 @@ def generate_new_quiz(
         title = f"Quiz from {pdf['filename']}"
         
     # Generate questions using parser engine
-    questions = generate_quiz(
-        pdf_path=pdf_path,
-        count=req.num_questions,
-        difficulty=req.difficulty,
-        api_key=req.gemini_api_key
-    )
+    tmp_path = None
+    try:
+        if pdf_path:
+            # Download GCS object to a temp file so pdfminer can read it
+            tmp_path = download_to_temp(pdf_path)
+        
+        # Handle language mode for Arabic PDFs
+        effective_language_mode = req.language_mode or "auto"
+        if tmp_path and effective_language_mode == "translate" and req.gemini_api_key:
+            # Translate Arabic content to English first, then generate questions
+            from backend.pdf_parser import extract_text_from_pdf as _extract
+            raw_text = _extract(tmp_path)
+            translated_text = translate_text_to_english(raw_text, req.gemini_api_key)
+            questions = generate_quiz(
+                pdf_path=None,  # pass None so we use text directly
+                count=req.num_questions,
+                difficulty=req.difficulty,
+                api_key=req.gemini_api_key,
+                pre_extracted_text=translated_text
+            )
+        else:
+            questions = generate_quiz(
+                pdf_path=tmp_path,
+                count=req.num_questions,
+                difficulty=req.difficulty,
+                api_key=req.gemini_api_key,
+                language_mode=effective_language_mode
+            )
+    finally:
+        if tmp_path:
+            try:
+                import os as _os
+                _os.remove(tmp_path)
+            except Exception:
+                pass
     
     if not questions:
         raise HTTPException(status_code=500, detail="Failed to generate questions. Try another document.")
