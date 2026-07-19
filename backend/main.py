@@ -12,7 +12,7 @@ from backend.database import (
     create_user, get_user_by_id, get_user_by_username, get_user_by_email,
     get_user_by_google_sub, update_user, delete_user,
     save_pdf_record, get_pdf_by_id, get_user_pdfs, delete_pdf as db_delete_pdf, delete_user_pdfs,
-    save_quiz, get_quiz_by_id, delete_user_quizzes,
+    save_quiz, get_quiz_by_id, get_user_quizzes, delete_user_quizzes,
     save_quiz_attempt, get_user_analytics, delete_user_quiz_attempts,
     create_password_reset_token, get_password_reset_token, mark_reset_token_used,
     save_flashcard_deck, get_flashcard_deck, get_user_flashcard_decks, delete_flashcard_deck,
@@ -599,6 +599,13 @@ def generate_new_quiz(
         "time_limit": req.time_limit,
         "questions": client_questions
     }
+
+
+@app.get("/api/quizzes/history")
+def get_user_quiz_history(user_id: str = Depends(get_current_user_id)):
+    """List all saved quizzes for the current user (used for multiplayer host mode)."""
+    quizzes = get_user_quizzes(user_id)
+    return {"quizzes": quizzes}
 
 class QuizSubmitRequest(BaseModel):
     quiz_id: str

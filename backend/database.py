@@ -252,6 +252,23 @@ def get_quiz_by_id(quiz_id: str, user_id: str) -> dict | None:
     return data
 
 
+def get_user_quizzes(user_id: str) -> list[dict]:
+    """List all saved quizzes for a user, most recent first."""
+    db = _get_db()
+    docs = db.collection("quizzes").where("user_id", "==", user_id).stream()
+    results = []
+    for doc in docs:
+        data = doc.to_dict()
+        results.append({
+            "id": doc.id,
+            "title": data.get("title", "Untitled Quiz"),
+            "pdf_id": data.get("pdf_id"),
+            "created_at": data.get("created_at").isoformat() if hasattr(data.get("created_at"), "isoformat") else str(data.get("created_at", "")),
+        })
+    results.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
+    return results
+
+
 def delete_user_quizzes(user_id: str) -> None:
     """Delete all quizzes for a user."""
     db = _get_db()

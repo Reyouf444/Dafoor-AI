@@ -89,11 +89,24 @@ export async function renderLiveQuiz(container, app, routeParams) {
                         <button id="create-room-btn" class="btn btn-primary" ${userQuizzes.length === 0 ? 'disabled' : ''} style="width: 100%;">
                             Create Room
                         </button>
+                        ${userQuizzes.length === 0 ? `
+                            <button id="go-practice-btn" class="btn btn-secondary" style="width: 100%; margin-top: 8px; font-size: 0.85rem;">
+                                <i class="fa-solid fa-sliders"></i> Go to Practice Tab to Create One
+                            </button>
+                        ` : ''}
                     </div>
 
                 </div>
             </div>
         `;
+
+        // Go to Practice button click
+        const goPracticeBtn = document.getElementById('go-practice-btn');
+        if (goPracticeBtn) {
+            goPracticeBtn.addEventListener('click', () => {
+                app.navigateTo('quiz-setup');
+            });
+        }
 
         // Join click
         document.getElementById('join-room-btn').addEventListener('click', async () => {
