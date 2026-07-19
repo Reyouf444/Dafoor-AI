@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dafoor AI - Elevate Your Learning</title>
     <meta name="author" content="Reyouf Alfawzan">
+    <meta name="description" content="Dafoor AI - AI-powered study suite for smarter learning with PDF quizzes, analytics, and more.">
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +14,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <!-- Lottie Web Player Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js" integrity="sha512-jEnuDt6sOuCgviBqyRn19z3KC40Y9NmamSuqd7YvY3RLm2I16LKmyv1qyvW9Fh01F624C0AODxkh8yKp5FQAWQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Google Identity Services (Sign In With Google) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <!-- App Custom Stylesheet -->
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -34,12 +37,21 @@
                     <a href="#quiz-setup" id="nav-quiz-setup" class="nav-item">
                         <i class="fa-solid fa-sliders"></i> Practice
                     </a>
+                    <a href="#flashcards" id="nav-flashcards" class="nav-item">
+                        <i class="fa-solid fa-layer-group"></i> Flashcards
+                    </a>
+                    <a href="#live-quiz" id="nav-live-quiz" class="nav-item">
+                        <i class="fa-solid fa-users"></i> Live Quiz
+                    </a>
                     <a href="#analytics" id="nav-analytics" class="nav-item">
                         <i class="fa-solid fa-chart-line"></i> Analytics
                     </a>
                 </nav>
                 <div class="user-menu">
                     <span id="user-display"><i class="fa-regular fa-circle-user"></i> Guest</span>
+                    <button id="settings-btn" class="btn btn-icon btn-secondary" title="Settings">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
                     <button id="logout-btn" class="btn btn-secondary">
                         <i class="fa-solid fa-right-from-bracket"></i> Logout
                     </button>
@@ -71,6 +83,13 @@
             "pdf-lib": "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.esm.min.js"
         }
     }
+    </script>
+
+    <!-- Google Client ID Configuration (set via environment or replace placeholder) -->
+    <script>
+        // This will be set from your Google Cloud Console OAuth 2.0 Client ID
+        // Replace with your actual Client ID or set via server-side injection
+        window.__GOOGLE_CLIENT_ID = '1083217555434-onk7crgt0vh8br844av8ffqrc7t76ecm.apps.googleusercontent.com';
     </script>
 
     <!-- Application Controller -->

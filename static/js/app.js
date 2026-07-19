@@ -7,13 +7,16 @@ import { renderDashboard } from './components/dashboard.js';
 import { renderQuizSetup } from './components/quizSetup.js';
 import { renderQuizActive } from './components/quizActive.js';
 import { renderAnalytics } from './components/analytics.js';
+import { renderSettings } from './components/settings.js';
+import { renderFlashcards } from './components/flashcards.js';
+import { renderLiveQuiz } from './components/liveQuiz.js';
 
 class App {
     constructor() {
         this.state = {
             token: localStorage.getItem('token') || null,
             username: localStorage.getItem('username') || null,
-            currentView: 'auth', // auth, dashboard, quiz-setup, quiz-active, analytics
+            currentView: 'auth', // auth, dashboard, quiz-setup, quiz-active, analytics, settings
             pdfs: [],
             activeQuiz: null, // Holds active quiz details
             geminiApiKey: localStorage.getItem('gemini_api_key') || ''
@@ -51,7 +54,7 @@ class App {
                 
                 // Route based on URL hash or default to dashboard
                 const hash = window.location.hash.substring(1);
-                if (['dashboard', 'quiz-setup', 'analytics'].includes(hash)) {
+                if (['dashboard', 'quiz-setup', 'flashcards', 'live-quiz', 'analytics', 'settings'].includes(hash)) {
                     this.navigateTo(hash);
                 } else {
                     this.navigateTo('dashboard');
@@ -61,7 +64,13 @@ class App {
                 this.logout();
             }
         } else {
-            this.navigateTo('auth');
+            // Check if we're on a password reset page
+            const hash = window.location.hash;
+            if (hash.startsWith('#reset-password')) {
+                this.navigateTo('auth');
+            } else {
+                this.navigateTo('auth');
+            }
         }
     }
 
@@ -80,10 +89,19 @@ class App {
             this.logoutBtn.addEventListener('click', () => this.logout());
         }
 
+        // Settings button
+        const settingsBtn = document.getElementById('settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigateTo('settings');
+            });
+        }
+
         // Handle browser forward/back buttons (hash changes)
         window.addEventListener('hashchange', () => {
             const hash = window.location.hash.substring(1);
-            if (this.state.token && ['dashboard', 'quiz-setup', 'analytics'].includes(hash)) {
+            if (this.state.token && ['dashboard', 'quiz-setup', 'flashcards', 'live-quiz', 'analytics', 'settings'].includes(hash)) {
                 if (this.state.currentView !== hash) {
                     this.navigateTo(hash, null, false); // Don't push state since hash changed
                 }
@@ -103,7 +121,10 @@ class App {
         
         if (updateHash) {
             if (view === 'auth') {
-                window.location.hash = '';
+                // Preserve reset-password hash if present
+                if (!window.location.hash.startsWith('#reset-password')) {
+                    window.location.hash = '';
+                }
             } else if (view !== 'quiz-active') {
                 window.location.hash = view;
             }
@@ -127,6 +148,16 @@ class App {
                     link.classList.remove('active');
                 }
             });
+
+            // Highlight settings button if on settings page
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                if (this.state.currentView === 'settings') {
+                    settingsBtn.classList.add('active');
+                } else {
+                    settingsBtn.classList.remove('active');
+                }
+            }
         } else {
             this.header.classList.add('hidden');
         }
@@ -153,6 +184,15 @@ class App {
                     break;
                 case 'analytics':
                     await renderAnalytics(this.container, this);
+                    break;
+                case 'flashcards':
+                    await renderFlashcards(this.container, this);
+                    break;
+                case 'live-quiz':
+                    await renderLiveQuiz(this.container, this, params);
+                    break;
+                case 'settings':
+                    await renderSettings(this.container, this);
                     break;
                 default:
                     this.container.innerHTML = '<h2>404 - View Not Found</h2>';

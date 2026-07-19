@@ -58,7 +58,7 @@ def _get_db():
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def create_session(token: str, user_id: int) -> None:
+def create_session(token: str, user_id: str) -> None:
     """Write a new session document to Firestore."""
     now        = datetime.now(tz=timezone.utc)
     expires_at = now + timedelta(hours=SESSION_TTL_HOURS)
@@ -71,7 +71,7 @@ def create_session(token: str, user_id: int) -> None:
     logger.debug("Session created for user_id=%s, expires=%s", user_id, expires_at)
 
 
-def verify_session(token: str) -> int | None:
+def verify_session(token: str) -> str | None:
     """Return user_id for a valid, non-expired token, or None."""
     if not token:
         return None
@@ -111,7 +111,7 @@ def delete_session(token: str) -> None:
         logger.warning("Could not delete session from Firestore: %s", exc)
 
 
-def delete_all_user_sessions(user_id: int) -> None:
+def delete_all_user_sessions(user_id: str) -> None:
     """Remove every session belonging to a user (e.g. force-logout all devices)."""
     try:
         db   = _get_db()

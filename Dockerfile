@@ -29,9 +29,8 @@ COPY --from=builder /install /usr/local
 COPY backend/ ./backend/
 COPY static/  ./static/
 
-# Create the data directory and set ownership
-RUN mkdir -p backend/data/pdfs \
-    && chown -R appuser:appuser /app
+# Set ownership of app directory
+RUN chown -R appuser:appuser /app
 
 # Switch to non-root user
 USER appuser

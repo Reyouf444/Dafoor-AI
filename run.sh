@@ -45,5 +45,12 @@ echo "  Open this link in your web browser to access the app.   "
 echo "  To shut down, press [CTRL+C] in this terminal.          "
 echo "----------------------------------------------------------"
 
+# Set environment variables for local development
+export FIRESTORE_PROJECT_ID=spartan-cosmos-502110-d5
+export GOOGLE_CLIENT_ID=1083217555434-onk7crgt0vh8br844av8ffqrc7t76ecm.apps.googleusercontent.com
+export SMTP_USER=reyouf14@gmail.com
+export SMTP_PASSWORD="vsvd babm zhoq suve"
+export APP_BASE_URL=http://localhost:8000
+
 # Launch application
 exec uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload

@@ -116,10 +116,50 @@ export function renderQuizActive(container, app, quizData) {
         const qCard = document.getElementById('question-card');
         const q = questions[currentQuestionIdx];
         const isFlagged = flaggedQuestions[currentQuestionIdx];
+        const qtype = q.type || 'mcq';
+        const userAns = userAnswers[currentQuestionIdx];
         
+        let choicesHtml = '';
+
+        if (qtype === 'fillblank') {
+            const currentVal = (userAns !== -1 && userAns !== undefined && userAns !== null) ? userAns : '';
+            choicesHtml = `
+                <div class="fillblank-container" style="margin: 20px 0;">
+                    <label style="display:block; font-size:0.9rem; color:#9ca3af; margin-bottom:8px;">
+                        Type your answer (exact match):
+                    </label>
+                    <input 
+                        type="text" 
+                        id="fillblank-input" 
+                        class="form-input" 
+                        placeholder="Type answer here..." 
+                        value="${currentVal}"
+                        style="font-size: 1.1rem; padding: 14px; background: rgba(255,255,255,0.05); border: 2px solid var(--color-border); border-radius: 12px; color: #fff; width: 100%; transition: border-color 0.2s;"
+                    />
+                </div>
+            `;
+        } else {
+            // MCQ or True/False choices
+            const choicesList = q.choices && q.choices.length ? q.choices : (qtype === 'truefalse' ? ['True', 'False'] : []);
+            choicesHtml = `
+                <div class="choices-container">
+                    ${choicesList.map((choice, idx) => {
+                        const letter = String.fromCharCode(65 + idx); // A, B, C, D
+                        const isSelected = userAns === idx;
+                        return `
+                            <div class="choice-option ${isSelected ? 'selected' : ''}" data-idx="${idx}">
+                                <div class="choice-letter">${letter}</div>
+                                <div class="choice-text">${choice}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         qCard.innerHTML = `
             <div class="question-header">
-                <span class="question-num">Question ${currentQuestionIdx + 1} of ${totalQuestions}</span>
+                <span class="question-num">Question ${currentQuestionIdx + 1} of ${totalQuestions} <span style="font-size:0.75rem; background:rgba(255,255,255,0.1); padding:2px 8px; border-radius:10px; margin-left:8px; text-transform:uppercase;">${qtype}</span></span>
                 <button id="flag-btn-toggle" class="flag-action-btn ${isFlagged ? 'flagged' : ''}">
                     <i class="${isFlagged ? 'fa-solid' : 'fa-regular'} fa-flag"></i> 
                     ${isFlagged ? 'Flagged' : 'Flag Question'}
@@ -128,18 +168,7 @@ export function renderQuizActive(container, app, quizData) {
             
             <p class="question-text">${q.question}</p>
             
-            <div class="choices-container">
-                ${q.choices.map((choice, idx) => {
-                    const letter = String.fromCharCode(65 + idx); // A, B, C, D
-                    const isSelected = userAnswers[currentQuestionIdx] === idx;
-                    return `
-                        <div class="choice-option ${isSelected ? 'selected' : ''}" data-idx="${idx}">
-                            <div class="choice-letter">${letter}</div>
-                            <div class="choice-text">${choice}</div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
+            ${choicesHtml}
             
             <div class="quiz-navigation">
                 <button id="prev-q-btn" class="btn btn-secondary" ${currentQuestionIdx === 0 ? 'disabled' : ''}>
@@ -151,19 +180,28 @@ export function renderQuizActive(container, app, quizData) {
             </div>
         `;
 
-        // Bind clicks for choice option selection
-        qCard.querySelectorAll('.choice-option').forEach(option => {
-            option.addEventListener('click', () => {
-                const idx = parseInt(option.getAttribute('data-idx'));
-                userAnswers[currentQuestionIdx] = idx;
-                
-                // Redraw option states and flag grid
-                qCard.querySelectorAll('.choice-option').forEach(opt => opt.classList.remove('selected'));
-                option.classList.add('selected');
-                
+        if (qtype === 'fillblank') {
+            const inputEl = document.getElementById('fillblank-input');
+            inputEl.addEventListener('input', () => {
+                const text = inputEl.value.trim();
+                userAnswers[currentQuestionIdx] = text !== '' ? text : -1;
                 drawFlagGrid();
             });
-        });
+        } else {
+            // Bind clicks for choice option selection
+            qCard.querySelectorAll('.choice-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    const idx = parseInt(option.getAttribute('data-idx'));
+                    userAnswers[currentQuestionIdx] = idx;
+                    
+                    // Redraw option states and flag grid
+                    qCard.querySelectorAll('.choice-option').forEach(opt => opt.classList.remove('selected'));
+                    option.classList.add('selected');
+                    
+                    drawFlagGrid();
+                });
+            });
+        }
 
         // Bind flag toggle button click
         document.getElementById('flag-btn-toggle').addEventListener('click', () => {

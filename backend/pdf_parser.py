@@ -370,44 +370,54 @@ def _heuristic_english(text: str, count: int) -> list:
 # Gemini API quiz generator (Arabic + English aware)
 # ---------------------------------------------------------------------------
 
-def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: str) -> list:
-    """Generate quiz using Gemini API. Instructs Gemini to use Arabic if the text is Arabic."""
+def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: str, question_types: list = None) -> list:
+    """Generate quiz using Gemini API with support for multiple question types."""
     is_arabic = _is_arabic_text(text)
     truncated_text = text[:40000]
 
+    # Normalize question_types
+    if not question_types:
+        question_types = ["mcq"]
+    if "mixed" in question_types:
+        question_types = ["mcq", "truefalse", "fillblank"]
+
+    # Build type description for the prompt
     if is_arabic:
-        lang_instruction = (
-            "النص المقدم باللغة العربية. يجب أن تكون جميع الأسئلة والخيارات والشرح باللغة العربية الفصحى."
-        )
+        type_map = {"mcq": "اختيار متعدد (4 خيارات)", "truefalse": "صح أو خطأ", "fillblank": "أكمل الفراغ"}
+        type_list_str = " و ".join(type_map[t] for t in question_types if t in type_map)
         difficulty_ar = {"Easy": "سهل", "Medium": "متوسط", "Hard": "صعب"}.get(difficulty, "متوسط")
+        type_schema = """كل كائن سؤال يجب أن يحتوي على:
+- "type": نوع السؤال: "mcq" أو "truefalse" أو "fillblank"
+- "question": نص السؤال (لنوع أكمل الفراغ، استخدم ___ مكان الإجابة)
+- "choices": مصفوفة الخيارات (4 خيارات لـ mcq، ["صح", "خطأ"] لـ truefalse، مصفوفة فارغة [] لـ fillblank)
+- "correct_index": رقم صحيح (0-3 لـ mcq، 0 أو 1 لـ truefalse، -1 لـ fillblank)
+- "correct_answer_text": الإجابة الدقيقة كنص (فقط لـ fillblank، وإلا "")
+- "explanation": شرح موجز"""
         prompt = (
-            f"أنت خبير تعليمي. قم بإنشاء اختبار دراسي عالي الجودة بناءً على النص التالي.\n"
-            f"{lang_instruction}\n"
-            f"أنشئ بالضبط {count} سؤالاً من نوع الاختيار المتعدد. مستوى الصعوبة: {difficulty_ar}.\n"
-            f"المتطلبات:\n"
-            f"1. أعد فقط مصفوفة JSON صالحة من كائنات الأسئلة. لا تضع JSON داخل ```json أو أي تنسيق markdown.\n"
-            f"2. يجب أن يحتوي كل كائن سؤال على البنية التالية بالضبط:\n"
-            f"   {{\n"
-            f"     \"question\": \"نص السؤال هنا\",\n"
-            f"     \"choices\": [\"الخيار أ\", \"الخيار ب\", \"الخيار ج\", \"الخيار د\"],\n"
-            f"     \"correct_index\": رقم صحيح (0-3) يمثل فهرس الإجابة الصحيحة,\n"
-            f"     \"explanation\": \"شرح موجز لماذا هذه الإجابة صحيحة\"\n"
-            f"   }}\n"
+            f"أنت خبير تعليمي. أنشئ اختباراً دراسياً عالي الجودة بناءً على النص التالي.\n"
+            f"النص المقدم باللغة العربية. يجب أن تكون جميع الأسئلة والخيارات والشرح باللغة العربية الفصحى.\n"
+            f"أنشئ بالضبط {count} سؤالاً من أنواع: {type_list_str}. مستوى الصعوبة: {difficulty_ar}.\n"
+            f"وزّع الأسئلة بالتساوي بين الأنواع المطلوبة.\n"
+            f"أعد فقط مصفوفة JSON صالحة. لا تضعها داخل ```json.\n"
+            f"{type_schema}\n"
             f"النص:\n{truncated_text}"
         )
     else:
+        type_map = {"mcq": "multiple choice (4 options)", "truefalse": "true/false", "fillblank": "fill in the blank"}
+        type_list_str = " and ".join(type_map[t] for t in question_types if t in type_map)
+        type_schema = """Each question object must have:
+- "type": "mcq" | "truefalse" | "fillblank"
+- "question": question text (for fillblank, use ___ where the answer goes)
+- "choices": ["Option A","Option B","Option C","Option D"] for mcq, ["True","False"] for truefalse, [] for fillblank
+- "correct_index": 0-3 for mcq, 0 or 1 for truefalse, -1 for fillblank
+- "correct_answer_text": exact expected answer string for fillblank only, else ""
+- "explanation": brief explanation"""
         prompt = (
             f"You are an expert AI educator. Generate a high-quality study quiz based on the following text.\n"
-            f"Generate exactly {count} multiple choice questions. Difficulty level: {difficulty}.\n"
-            f"Requirements:\n"
-            f"1. Return ONLY a valid JSON array of question objects. Do NOT wrap the JSON in ```json or any markdown formatting.\n"
-            f"2. Each question object must have exactly the following structure:\n"
-            f"   {{\n"
-            f"     \"question\": \"Question text here\",\n"
-            f"     \"choices\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n"
-            f"     \"correct_index\": integer index (0-3) of the correct choice,\n"
-            f"     \"explanation\": \"Brief explanation of why this answer is correct\"\n"
-            f"   }}\n"
+            f"Generate exactly {count} questions using these types: {type_list_str}. Difficulty: {difficulty}.\n"
+            f"Distribute questions evenly across the requested types.\n"
+            f"Return ONLY a valid JSON array. Do NOT wrap in ```json or any markdown.\n"
+            f"{type_schema}\n"
             f"Text:\n{truncated_text}"
         )
 
@@ -425,30 +435,57 @@ def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: st
             res_data = json.loads(response.read().decode("utf-8"))
             text_response = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
 
-            # Strip markdown code fences if present
             if text_response.startswith("```"):
                 lines = text_response.splitlines()
-                if lines[0].startswith("```"):
-                    lines = lines[1:]
-                if lines and lines[-1].startswith("```"):
-                    lines = lines[:-1]
+                if lines[0].startswith("```"): lines = lines[1:]
+                if lines and lines[-1].startswith("```"): lines = lines[:-1]
                 text_response = "\n".join(lines).strip()
 
             parsed_questions = json.loads(text_response)
 
             if isinstance(parsed_questions, list) and len(parsed_questions) > 0:
                 validated = []
+                none_label = "لا شيء مما سبق" if is_arabic else "None of the above"
                 for q in parsed_questions:
-                    if "question" in q and "choices" in q and "correct_index" in q:
-                        none_label = "لا شيء مما سبق" if is_arabic else "None of the above"
-                        while len(q["choices"]) < 4:
-                            q["choices"].append(none_label)
-                        q["choices"] = q["choices"][:4]
+                    if "question" not in q or "type" not in q:
+                        continue
+                    qtype = q.get("type", "mcq")
+                    if qtype == "mcq":
+                        if "choices" not in q or "correct_index" not in q:
+                            continue
+                        choices = list(q["choices"])
+                        while len(choices) < 4: choices.append(none_label)
                         validated.append({
+                            "type": "mcq",
                             "question": q["question"],
-                            "choices": q["choices"],
+                            "choices": choices[:4],
                             "correct_index": int(q["correct_index"]),
-                            "explanation": q.get("explanation", "استناداً إلى محتوى النص." if is_arabic else "Based on the text contents.")
+                            "correct_answer_text": "",
+                            "explanation": q.get("explanation", "Based on the text." if not is_arabic else "استناداً للنص.")
+                        })
+                    elif qtype == "truefalse":
+                        if "correct_index" not in q:
+                            continue
+                        tf_choices = ["صح", "خطأ"] if is_arabic else ["True", "False"]
+                        validated.append({
+                            "type": "truefalse",
+                            "question": q["question"],
+                            "choices": tf_choices,
+                            "correct_index": int(q["correct_index"]),
+                            "correct_answer_text": "",
+                            "explanation": q.get("explanation", "")
+                        })
+                    elif qtype == "fillblank":
+                        ans_text = str(q.get("correct_answer_text", "")).strip()
+                        if not ans_text:
+                            continue
+                        validated.append({
+                            "type": "fillblank",
+                            "question": q["question"],
+                            "choices": [],
+                            "correct_index": -1,
+                            "correct_answer_text": ans_text,
+                            "explanation": q.get("explanation", "")
                         })
                 if validated:
                     return validated[:count]
@@ -456,7 +493,12 @@ def generate_quiz_via_gemini(text: str, count: int, difficulty: str, api_key: st
     except Exception as e:
         print(f"Gemini API failed: {e}. Falling back to local heuristic generator.")
 
-    return parse_pdf_heuristically(text, count, difficulty)
+    # Heuristic fallback — all MCQ, add type/correct_answer_text fields
+    fallback = parse_pdf_heuristically(text, count, difficulty)
+    for q in fallback:
+        if "type" not in q: q["type"] = "mcq"
+        if "correct_answer_text" not in q: q["correct_answer_text"] = ""
+    return fallback
 
 
 # ---------------------------------------------------------------------------
@@ -508,7 +550,8 @@ def generate_quiz(
     difficulty: str,
     api_key: str = None,
     language_mode: str = "auto",
-    pre_extracted_text: str = None
+    pre_extracted_text: str = None,
+    question_types: list = None,
 ) -> list:
     """Generate a quiz from a PDF file (or general knowledge if no file given).
     
@@ -519,7 +562,7 @@ def generate_quiz(
         api_key: Optional Gemini API key for AI-powered generation.
         language_mode: 'auto' | 'arabic' | 'translate' — controls question language.
         pre_extracted_text: If provided, skips PDF reading and uses this text directly.
-                            Used when Arabic text has already been translated externally.
+        question_types: List of types to generate: 'mcq', 'truefalse', 'fillblank', 'mixed'.
     """
     # Use pre-extracted text if supplied (e.g., already translated Arabic)
     if pre_extracted_text:
@@ -535,9 +578,113 @@ def generate_quiz(
         random.shuffle(bank_copy)
         while len(bank_copy) < count:
             bank_copy += bank_copy
-        return bank_copy[:count]
+        result = bank_copy[:count]
+        for q in result:
+            if "type" not in q: q["type"] = "mcq"
+            if "correct_answer_text" not in q: q["correct_answer_text"] = ""
+        return result
 
     if api_key:
-        return generate_quiz_via_gemini(text, count, difficulty, api_key)
+        return generate_quiz_via_gemini(text, count, difficulty, api_key, question_types=question_types)
     else:
-        return parse_pdf_heuristically(text, count, difficulty)
+        fallback = parse_pdf_heuristically(text, count, difficulty)
+        for q in fallback:
+            if "type" not in q: q["type"] = "mcq"
+            if "correct_answer_text" not in q: q["correct_answer_text"] = ""
+        return fallback
+
+
+# ---------------------------------------------------------------------------
+# Flashcard generator — term/definition pairs via Gemini
+# ---------------------------------------------------------------------------
+
+def generate_flashcards(text: str, count: int = 20, api_key: str = None) -> list:
+    """Generate flashcard term/definition pairs from text using Gemini.
+    
+    Falls back to heuristic extraction if no API key or Gemini fails.
+    Returns: [{"front": "term", "back": "definition"}, ...]
+    """
+    if not text or len(text) < 50:
+        return []
+
+    is_arabic = _is_arabic_text(text)
+    truncated_text = text[:40000]
+
+    if api_key:
+        if is_arabic:
+            prompt = (
+                f"أنت خبير تعليمي. استخرج {count} مصطلحاً وتعريفاً من النص التالي لإنشاء بطاقات دراسية.\n"
+                f"أعد فقط مصفوفة JSON صالحة. لا تضعها داخل ```json.\n"
+                f"كل كائن يجب أن يحتوي على:\n"
+                f'- "front": المصطلح أو المفهوم الرئيسي (موجز، 1-5 كلمات)\n'
+                f'- "back": التعريف أو الشرح (جملة أو جملتان)\n'
+                f"النص:\n{truncated_text}"
+            )
+        else:
+            prompt = (
+                f"You are an expert educator. Extract {count} key terms and definitions from the following text to create study flashcards.\n"
+                f"Return ONLY a valid JSON array. Do NOT wrap in ```json or any markdown.\n"
+                f"Each object must have:\n"
+                f'- "front": The key term or concept (concise, 1-5 words)\n'
+                f'- "back": The definition or explanation (1-2 sentences)\n'
+                f"Text:\n{truncated_text}"
+            )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        req_body = json.dumps(data).encode("utf-8")
+
+        try:
+            req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=45) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                text_response = res_data['candidates'][0]['content']['parts'][0]['text'].strip()
+
+                if text_response.startswith("```"):
+                    lines = text_response.splitlines()
+                    if lines[0].startswith("```"): lines = lines[1:]
+                    if lines and lines[-1].startswith("```"): lines = lines[:-1]
+                    text_response = "\n".join(lines).strip()
+
+                parsed = json.loads(text_response)
+                if isinstance(parsed, list):
+                    cards = [
+                        {"front": str(item["front"]).strip(), "back": str(item["back"]).strip()}
+                        for item in parsed if "front" in item and "back" in item
+                    ]
+                    if cards:
+                        return cards[:count]
+        except Exception as e:
+            print(f"Gemini flashcard generation failed: {e}. Falling back to heuristic.")
+
+    # Heuristic fallback
+    return _heuristic_flashcards(text, count, is_arabic)
+
+
+def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
+    """Extract term/definition pairs using regex heuristics."""
+    cards = []
+    text = re.sub(r'\s+', ' ', text)
+
+    if is_arabic:
+        pattern = re.compile(
+            r'([\u0600-\u06FF\s]{3,30})\s+(هو|هي|يعني|تعني|يُعرَّف بأنه|هي عبارة عن)\s+([\u0600-\u06FF\s،.]{10,150})'
+        )
+    else:
+        pattern = re.compile(
+            r'\b([A-Z][a-zA-Z0-9\s-]{2,30})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]{10,150})'
+        )
+
+    for match in pattern.finditer(text):
+        term = match.group(1).strip()
+        definition = match.group(3).strip()
+        if len(term) > 2 and len(definition) > 10:
+            cards.append({"front": term, "back": definition})
+        if len(cards) >= count:
+            break
+
+    return cards[:count]

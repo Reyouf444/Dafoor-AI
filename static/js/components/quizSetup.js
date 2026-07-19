@@ -20,6 +20,7 @@ export async function renderQuizSetup(container, app) {
     let selectedDifficulty = 'Medium';
     let questionCount = 10;
     let timeLimit = 15; // Minutes
+    let questionTypes = ['mcq']; // selected question types
     let detectedLanguage = null;  // null = unknown, 'arabic', 'english'
     let languageMode = 'arabic';  // 'arabic' | 'translate'
     let isDetecting = false;
@@ -186,6 +187,36 @@ export async function renderQuizSetup(container, app) {
                             />
                         </div>
 
+                        <!-- Question Type Selector -->
+                        <div class="form-group">
+                            <label class="form-label">Question Format</label>
+                            <div class="qtype-grid" id="qtype-grid">
+                                <button type="button" class="qtype-btn ${questionTypes.includes('mcq') ? 'active' : ''}" data-type="mcq">
+                                    <i class="fa-solid fa-list-check"></i>
+                                    <span>Multiple Choice</span>
+                                    <small>4 options</small>
+                                </button>
+                                <button type="button" class="qtype-btn ${questionTypes.includes('truefalse') ? 'active' : ''}" data-type="truefalse">
+                                    <i class="fa-solid fa-circle-half-stroke"></i>
+                                    <span>True / False</span>
+                                    <small>2 options</small>
+                                </button>
+                                <button type="button" class="qtype-btn ${questionTypes.includes('fillblank') ? 'active' : ''}" data-type="fillblank">
+                                    <i class="fa-solid fa-keyboard"></i>
+                                    <span>Fill in Blank</span>
+                                    <small>Type the answer</small>
+                                </button>
+                                <button type="button" class="qtype-btn ${questionTypes.includes('mixed') ? 'active' : ''}" data-type="mixed">
+                                    <i class="fa-solid fa-shuffle"></i>
+                                    <span>Mixed</span>
+                                    <small>All types</small>
+                                </button>
+                            </div>
+                            <p id="qtype-hint" style="font-size:0.8rem; color:#6b7280; margin-top:6px; min-height:18px;">
+                                ${_qtypeHint(questionTypes)}
+                            </p>
+                        </div>
+
                         <!-- CTA Button -->
                         <button type="submit" id="generate-btn" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
                             <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Study Quiz
@@ -200,6 +231,18 @@ export async function renderQuizSetup(container, app) {
         bindEvents();
     }
 
+    function _qtypeHint(types) {
+        if (types.includes('mixed')) return '🔀 All question types mixed evenly';
+        if (types.length === 3) return '🔀 Custom mix of all three types';
+        if (types.includes('mcq') && types.includes('truefalse')) return 'Mix of Multiple Choice and True/False';
+        if (types.includes('mcq') && types.includes('fillblank')) return 'Mix of Multiple Choice and Fill in Blank';
+        if (types.includes('truefalse') && types.includes('fillblank')) return 'Mix of True/False and Fill in Blank';
+        if (types.includes('mcq')) return '4-option multiple choice questions';
+        if (types.includes('truefalse')) return 'True or False statement questions';
+        if (types.includes('fillblank')) return 'Type the exact missing word or phrase';
+        return 'Select at least one question type';
+    }
+
     function bindEvents() {
         const form = document.getElementById('quiz-config-form');
         const pdfSelect = document.getElementById('pdf-select');
@@ -209,6 +252,32 @@ export async function renderQuizSetup(container, app) {
         const timerVal = document.getElementById('timer-val');
         const tabBtns = container.querySelectorAll('.tab-btn');
         const generateBtn = document.getElementById('generate-btn');
+
+        // Question type toggles (multi-select, 'mixed' is exclusive)
+        container.querySelectorAll('.qtype-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const t = btn.getAttribute('data-type');
+                if (t === 'mixed') {
+                    // Mixed is exclusive
+                    questionTypes = ['mixed'];
+                } else {
+                    // Remove 'mixed' if a specific type chosen
+                    questionTypes = questionTypes.filter(x => x !== 'mixed');
+                    if (questionTypes.includes(t)) {
+                        questionTypes = questionTypes.filter(x => x !== t);
+                        if (questionTypes.length === 0) questionTypes = ['mcq']; // never empty
+                    } else {
+                        questionTypes.push(t);
+                    }
+                }
+                // Update button states
+                container.querySelectorAll('.qtype-btn').forEach(b => {
+                    b.classList.toggle('active', questionTypes.includes(b.getAttribute('data-type')));
+                });
+                const hint = document.getElementById('qtype-hint');
+                if (hint) hint.textContent = _qtypeHint(questionTypes);
+            });
+        });
 
         // Dropdown selection change — trigger language detection
         pdfSelect.addEventListener('change', () => {
@@ -282,7 +351,8 @@ export async function renderQuizSetup(container, app) {
                         difficulty: selectedDifficulty,
                         time_limit: timeLimit,
                         gemini_api_key: app.state.geminiApiKey || null,
-                        language_mode: effectiveLanguageMode
+                        language_mode: effectiveLanguageMode,
+                        question_types: questionTypes,
                     })
                 });
 
