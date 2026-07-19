@@ -137,7 +137,7 @@ export async function renderDashboard(container, app) {
                 if (confirm("Are you sure you want to delete this study document? All generated quizzes based on it will lose references.")) {
                     try {
                         await app.apiFetch(`/api/pdfs/${id}`, { method: 'DELETE' });
-                        pdfs = pdfs.filter(p => p.id !== parseInt(id));
+                        pdfs = pdfs.filter(p => String(p.id) !== String(id));
                         app.state.pdfs = pdfs;
                         app.showToast("Document deleted.", 'success');
                         draw();

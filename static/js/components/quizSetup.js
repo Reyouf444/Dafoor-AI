@@ -281,7 +281,7 @@ export async function renderQuizSetup(container, app) {
 
         // Dropdown selection change — trigger language detection
         pdfSelect.addEventListener('change', () => {
-            selectedPdfId = pdfSelect.value ? parseInt(pdfSelect.value) : null;
+            selectedPdfId = pdfSelect.value ? pdfSelect.value : null;
             detectedLanguage = null;
             languageMode = 'arabic'; // reset mode
             detectLanguage(selectedPdfId);

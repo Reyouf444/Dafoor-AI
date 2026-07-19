@@ -519,8 +519,10 @@ def generate_new_quiz(
     pdf_path = None
     title = "General Knowledge Quiz"
     
-    if req.pdf_id:
-        pdf = get_pdf_by_id(req.pdf_id, user_id)
+    effective_pdf_id = req.pdf_id if (req.pdf_id and str(req.pdf_id).lower() not in ("null", "nan", "undefined", "")) else None
+
+    if effective_pdf_id:
+        pdf = get_pdf_by_id(effective_pdf_id, user_id)
         if not pdf:
             raise HTTPException(status_code=404, detail="Selected PDF not found")
         pdf_path = pdf["file_path"]
@@ -578,7 +580,7 @@ def generate_new_quiz(
     # Store full quiz in DB (including answers)
     quiz_id = save_quiz(
         user_id=user_id,
-        pdf_id=req.pdf_id,
+        pdf_id=effective_pdf_id,
         title=title,
         config_json=config_json,
         questions_json=questions_json,
