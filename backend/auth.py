@@ -60,45 +60,70 @@ def verify_password(password: str, hashed: str) -> bool:
 # ── Google OAuth helpers ──────────────────────────────────────────────────────
 
 def verify_google_id_token(id_token: str) -> dict | None:
-    """Verify a Google ID token and return the user's profile info.
+    """Verify a Google ID token (or access token) and return the user's profile info.
 
     Returns a dict with keys: sub, email, name, picture (or None on failure).
-
-    Uses the google-auth library to verify the token against Google's
-    public keys and checks the audience matches our GOOGLE_CLIENT_ID.
+    Uses google-auth with fallback to official Google OAuth2 tokeninfo/userinfo endpoints.
     """
-    if not GOOGLE_CLIENT_ID:
-        logger.error("GOOGLE_CLIENT_ID not configured — cannot verify Google tokens")
-        return None
+    client_id = os.getenv("GOOGLE_CLIENT_ID", GOOGLE_CLIENT_ID)
 
+    # Method 1: google-auth library
     try:
         from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
 
-        # Verify the token — this checks signature, expiry, audience, and issuer
         idinfo = google_id_token.verify_oauth2_token(
             id_token,
             google_requests.Request(),
-            GOOGLE_CLIENT_ID,
+            client_id if client_id else None,
         )
-
-        # Ensure the token was issued by Google
-        if idinfo.get("iss") not in ("accounts.google.com", "https://accounts.google.com"):
-            logger.warning("Google ID token has unexpected issuer: %s", idinfo.get("iss"))
-            return None
-
-        return {
-            "sub": idinfo["sub"],            # Unique Google user ID
-            "email": idinfo.get("email"),
-            "name": idinfo.get("name", ""),
-            "picture": idinfo.get("picture", ""),
-        }
-    except ValueError as e:
-        logger.warning("Google ID token verification failed: %s", e)
-        return None
+        if idinfo.get("iss") in ("accounts.google.com", "https://accounts.google.com"):
+            return {
+                "sub": idinfo["sub"],
+                "email": idinfo.get("email", ""),
+                "name": idinfo.get("name", idinfo.get("email", "Google User")),
+                "picture": idinfo.get("picture", ""),
+            }
     except Exception as e:
-        logger.error("Unexpected error verifying Google ID token: %s", e)
-        return None
+        logger.warning("google-auth verification failed: %s — trying Google tokeninfo API", e)
+
+    # Method 2: Google tokeninfo API endpoint
+    try:
+        import urllib.request
+        import json
+        req_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+        req = urllib.request.Request(req_url)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("sub"):
+                return {
+                    "sub": data["sub"],
+                    "email": data.get("email", ""),
+                    "name": data.get("name", data.get("email", "Google User")),
+                    "picture": data.get("picture", ""),
+                }
+    except Exception as e:
+        logger.warning("tokeninfo endpoint failed: %s — trying userinfo API", e)
+
+    # Method 3: Google userinfo API endpoint (for access tokens)
+    try:
+        import urllib.request
+        import json
+        req_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+        req = urllib.request.Request(req_url, headers={"Authorization": f"Bearer {id_token}"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("sub"):
+                return {
+                    "sub": data["sub"],
+                    "email": data.get("email", ""),
+                    "name": data.get("name", data.get("email", "Google User")),
+                    "picture": data.get("picture", ""),
+                }
+    except Exception as e:
+        logger.error("All Google token verification methods failed: %s", e)
+
+    return None
 
 
 # ── Session helpers (thin wrappers around Firestore store) ───────────────────

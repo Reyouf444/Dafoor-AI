@@ -189,12 +189,7 @@ def get_pdf_by_id(pdf_id: str, user_id: str) -> dict | None:
 def get_user_pdfs(user_id: str) -> list[dict]:
     """List all PDFs for a user, most recent first."""
     db = _get_db()
-    docs = (
-        db.collection("pdfs")
-        .where("user_id", "==", user_id)
-        .order_by("uploaded_at", direction="DESCENDING")
-        .stream()
-    )
+    docs = db.collection("pdfs").where("user_id", "==", user_id).stream()
     results = []
     for doc in docs:
         data = doc.to_dict()
@@ -203,6 +198,7 @@ def get_user_pdfs(user_id: str) -> list[dict]:
         if hasattr(data.get("uploaded_at"), "isoformat"):
             data["uploaded_at"] = data["uploaded_at"].isoformat()
         results.append(data)
+    results.sort(key=lambda x: str(x.get("uploaded_at", "")), reverse=True)
     return results
 
 
@@ -305,12 +301,7 @@ def get_user_analytics(user_id: str) -> dict:
     db = _get_db()
 
     # Fetch all attempts for this user
-    attempts_docs = (
-        db.collection("quiz_attempts")
-        .where("user_id", "==", user_id)
-        .order_by("attempted_at")
-        .stream()
-    )
+    attempts_docs = db.collection("quiz_attempts").where("user_id", "==", user_id).stream()
 
     attempts = []
     total_score = 0.0
@@ -321,6 +312,8 @@ def get_user_analytics(user_id: str) -> dict:
         attempts.append(data)
         total_score += data.get("score", 0)
         total_time += data.get("time_spent_seconds", 0)
+
+    attempts.sort(key=lambda x: str(x.get("attempted_at", "")))
 
     total_quizzes = len(attempts)
     avg_score = round(total_score / total_quizzes, 1) if total_quizzes > 0 else 0.0
@@ -454,12 +447,7 @@ def get_flashcard_deck(deck_id: str, user_id: str) -> dict | None:
 def get_user_flashcard_decks(user_id: str) -> list[dict]:
     """List all flashcard decks for a user, most recent first."""
     db = _get_db()
-    docs = (
-        db.collection("flashcard_decks")
-        .where("user_id", "==", user_id)
-        .order_by("created_at", direction="DESCENDING")
-        .stream()
-    )
+    docs = db.collection("flashcard_decks").where("user_id", "==", user_id).stream()
     results = []
     for doc in docs:
         data = doc.to_dict()
@@ -468,6 +456,7 @@ def get_user_flashcard_decks(user_id: str) -> list[dict]:
             data["created_at"] = data["created_at"].isoformat()
         data.pop("cards", None)  # Don't include full card data in index
         results.append(data)
+    results.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
     return results
 
 

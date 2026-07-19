@@ -401,9 +401,8 @@ export function renderAuth(container, app) {
     async function handleGoogleSignIn() {
         const googleBtn = document.getElementById('google-signin-btn');
 
-        // Check if Google Identity Services is loaded
         if (!window.google || !window.google.accounts) {
-            app.showToast('Google Sign-In is not available. Please check your internet connection.', 'error');
+            app.showToast('Google Sign-In is loading... Please try again in a moment.', 'error');
             return;
         }
 
@@ -411,101 +410,42 @@ export function renderAuth(container, app) {
         googleBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Connecting...';
 
         try {
-            // Use Google Identity Services One Tap / popup
-            const client = window.google.accounts.oauth2.initTokenClient({
-                client_id: window.__GOOGLE_CLIENT_ID || '',
-                scope: 'openid email profile',
-                callback: async (tokenResponse) => {
-                    if (tokenResponse.error) {
-                        app.showToast('Google sign-in was cancelled.', 'error');
-                        resetGoogleBtn();
-                        return;
-                    }
-
-                    try {
-                        // Get the ID token using the access token
-                        const userInfoResp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                            headers: { 'Authorization': `Bearer ${tokenResponse.access_token}` }
-                        });
-                        
-                        if (!userInfoResp.ok) {
-                            throw new Error('Failed to get user info from Google');
+            if (window.google.accounts.oauth2) {
+                const client = window.google.accounts.oauth2.initTokenClient({
+                    client_id: window.__GOOGLE_CLIENT_ID || '',
+                    scope: 'openid email profile',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse.error) {
+                            app.showToast('Google sign-in was cancelled.', 'error');
+                            resetGoogleBtn();
+                            return;
                         }
 
-                        // Use the access token flow — send to our backend  
-                        // For the id_token approach, we need to use the credential from One Tap
-                        // Instead, let's use Google One Tap for the ID token
-                        await handleGoogleOneTap();
-                    } catch (err) {
-                        app.showToast(err.message, 'error');
-                        resetGoogleBtn();
+                        try {
+                            const result = await app.apiFetch('/api/auth/google', {
+                                method: 'POST',
+                                body: JSON.stringify({ id_token: tokenResponse.access_token })
+                            });
+
+                            const msg = result.is_new_user 
+                                ? 'Account created with Google!' 
+                                : 'Signed in with Google!';
+                            app.showToast(msg, 'success');
+                            app.setSession(result.token, result.username);
+                        } catch (err) {
+                            app.showToast(err.message, 'error');
+                            resetGoogleBtn();
+                        }
                     }
-                }
-            });
-
-            // Use Google One Tap instead for ID token
-            await handleGoogleOneTap();
-
+                });
+                client.requestAccessToken();
+            } else {
+                await handleGoogleOneTap();
+            }
         } catch (err) {
             app.showToast('Google Sign-In failed. Please try again.', 'error');
             resetGoogleBtn();
         }
-    }
-
-    async function handleGoogleOneTap() {
-        const googleBtn = document.getElementById('google-signin-btn');
-
-        return new Promise((resolve) => {
-            window.google.accounts.id.initialize({
-                client_id: window.__GOOGLE_CLIENT_ID || '',
-                callback: async (response) => {
-                    // response.credential contains the ID token (JWT)
-                    try {
-                        const result = await app.apiFetch('/api/auth/google', {
-                            method: 'POST',
-                            body: JSON.stringify({ id_token: response.credential })
-                        });
-
-                        const msg = result.is_new_user 
-                            ? 'Account created with Google!' 
-                            : 'Signed in with Google!';
-                        app.showToast(msg, 'success');
-                        app.setSession(result.token, result.username);
-                    } catch (err) {
-                        app.showToast(err.message, 'error');
-                        resetGoogleBtn();
-                    }
-                    resolve();
-                },
-                auto_select: false,
-            });
-
-            // Trigger the One Tap prompt
-            window.google.accounts.id.prompt((notification) => {
-                if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-                    // If One Tap not available, fall back to the sign-in button render
-                    const gBtnContainer = document.createElement('div');
-                    gBtnContainer.id = 'g_id_onload_fallback';
-                    gBtnContainer.style.display = 'none';
-                    document.body.appendChild(gBtnContainer);
-
-                    window.google.accounts.id.renderButton(gBtnContainer, {
-                        type: 'standard',
-                        size: 'large',
-                    });
-
-                    // Click the rendered button programmatically
-                    const innerBtn = gBtnContainer.querySelector('[role="button"]') || gBtnContainer.querySelector('div[tabindex]');
-                    if (innerBtn) {
-                        innerBtn.click();
-                    }
-                    
-                    // Cleanup
-                    setTimeout(() => gBtnContainer.remove(), 100);
-                    resolve();
-                }
-            });
-        });
     }
 
     function resetGoogleBtn() {

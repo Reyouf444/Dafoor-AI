@@ -666,9 +666,9 @@ def generate_flashcards(text: str, count: int = 20, api_key: str = None) -> list
 
 
 def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
-    """Extract term/definition pairs using regex heuristics."""
+    """Extract term/definition pairs using regex heuristics with fallback to sentence splitting."""
     cards = []
-    text = re.sub(r'\s+', ' ', text)
+    text_clean = re.sub(r'\s+', ' ', text)
 
     if is_arabic:
         pattern = re.compile(
@@ -679,12 +679,28 @@ def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
             r'\b([A-Z][a-zA-Z0-9\s-]{2,30})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]{10,150})'
         )
 
-    for match in pattern.finditer(text):
+    for match in pattern.finditer(text_clean):
         term = match.group(1).strip()
         definition = match.group(3).strip()
         if len(term) > 2 and len(definition) > 10:
             cards.append({"front": term, "back": definition})
         if len(cards) >= count:
             break
+
+    # If heuristic regex didn't find enough cards, extract from key sentences
+    if len(cards) < count:
+        sentences = [s.strip() for s in re.split(r'[.!?\n]+', text) if len(s.strip()) > 25]
+        for s in sentences:
+            if len(cards) >= count:
+                break
+            parts = s.split(':', 1)
+            if len(parts) == 2 and 3 <= len(parts[0].strip()) <= 40 and len(parts[1].strip()) >= 15:
+                cards.append({"front": parts[0].strip(), "back": parts[1].strip()})
+            else:
+                words = s.split()
+                if len(words) >= 8:
+                    front = " ".join(words[:4])
+                    back = " ".join(words[4:])
+                    cards.append({"front": front, "back": back})
 
     return cards[:count]
