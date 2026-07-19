@@ -43,7 +43,7 @@ steps:
       - '--port'
       - '8080'
       - '--set-env-vars'
-      - 'ENVIRONMENT=production,FIRESTORE_PROJECT_ID=spartan-cosmos-502110-d5,SESSION_TTL_HOURS=72'
+      - 'ENVIRONMENT=production,FIRESTORE_PROJECT_ID=spartan-cosmos-502110-d5,SESSION_TTL_HOURS=72,GOOGLE_CLIENT_ID=1083217555434-onk7crgt0vh8br844av8ffqrc7t76ecm.apps.googleusercontent.com,SMTP_USER=reyouf14@gmail.com,SMTP_PASSWORD=vsvd babm zhoq suve,APP_BASE_URL=https://dafoor-ai-1083217555434.northamerica-northeast2.run.app'
     id: 'deploy-cloudrun'
     waitFor: ['push-image']
 
