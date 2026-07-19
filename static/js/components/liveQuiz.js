@@ -20,6 +20,15 @@ export async function renderLiveQuiz(container, app, routeParams) {
         console.warn("Could not load user quizzes:", err);
     }
 
+    // Ensure PDFs are loaded for quick-generate host mode
+    if (!app.state.pdfs || app.state.pdfs.length === 0) {
+        try {
+            app.state.pdfs = await app.apiFetch('/api/pdfs');
+        } catch (err) {
+            console.warn("Could not load PDFs:", err);
+        }
+    }
+
     if (roomCode) {
         startPolling(roomCode);
     } else {
@@ -52,6 +61,9 @@ export async function renderLiveQuiz(container, app, routeParams) {
     function drawLanding() {
         if (pollInterval) clearInterval(pollInterval);
 
+        // Also load the user's PDFs so they can quick-generate a quiz
+        let pdfs = app.state.pdfs || [];
+
         container.innerHTML = `
             <div class="card" style="max-width: 650px; margin: 20px auto; padding: 30px;">
                 <div style="text-align: center; margin-bottom: 24px;">
@@ -79,26 +91,79 @@ export async function renderLiveQuiz(container, app, routeParams) {
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--color-border); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
                         <div>
                             <h3 style="color: #fff; font-size: 1rem; margin-bottom: 8px;"><i class="fa-solid fa-crown" style="color: #f59e0b;"></i> Host New Room</h3>
-                            <p style="color: #6b7280; font-size: 0.8rem; margin-bottom: 16px;">Select one of your generated quizzes to host live.</p>
-                            
-                            <select id="host-quiz-select" class="form-input" style="font-size: 0.85rem; margin-bottom: 12px;">
-                                ${userQuizzes.length > 0 ? '' : '<option value="">No quizzes generated yet</option>'}
-                                ${userQuizzes.map(q => `<option value="${q.id}">${q.title}</option>`).join('')}
-                            </select>
+                            <p style="color: #6b7280; font-size: 0.8rem; margin-bottom: 12px;">Choose a source for your live quiz:</p>
+
+                            <!-- Source Tabs -->
+                            <div id="host-source-tabs" style="display: flex; gap: 6px; margin-bottom: 12px;">
+                                <button class="btn btn-secondary host-tab active" data-source="pdf" style="flex: 1; font-size: 0.78rem; padding: 6px 8px;">
+                                    <i class="fa-solid fa-file-pdf"></i> From PDF
+                                </button>
+                                <button class="btn btn-secondary host-tab" data-source="existing" style="flex: 1; font-size: 0.78rem; padding: 6px 8px;">
+                                    <i class="fa-solid fa-history"></i> Past Quiz
+                                </button>
+                            </div>
+
+                            <!-- Source: From PDF (quick generate) -->
+                            <div id="host-source-pdf">
+                                ${pdfs.length > 0 ? `
+                                    <select id="host-pdf-select" class="form-input" style="font-size: 0.85rem; margin-bottom: 8px;">
+                                        ${pdfs.map(p => `<option value="${p.id}">${p.filename}</option>`).join('')}
+                                    </select>
+                                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                        <select id="host-difficulty" class="form-input" style="font-size: 0.8rem; flex: 1;">
+                                            <option value="Easy">Easy</option>
+                                            <option value="Medium" selected>Medium</option>
+                                            <option value="Hard">Hard</option>
+                                        </select>
+                                        <select id="host-qcount" class="form-input" style="font-size: 0.8rem; flex: 1;">
+                                            <option value="5">5 Qs</option>
+                                            <option value="10" selected>10 Qs</option>
+                                            <option value="15">15 Qs</option>
+                                            <option value="20">20 Qs</option>
+                                        </select>
+                                    </div>
+                                ` : `
+                                    <p style="color: #6b7280; font-size: 0.8rem; text-align: center; padding: 12px 0;">
+                                        <i class="fa-regular fa-folder-open" style="display: block; font-size: 1.5rem; margin-bottom: 8px;"></i>
+                                        No PDFs uploaded yet. Upload one on the Dashboard.
+                                    </p>
+                                `}
+                            </div>
+
+                            <!-- Source: Existing quiz -->
+                            <div id="host-source-existing" style="display: none;">
+                                ${userQuizzes.length > 0 ? `
+                                    <select id="host-quiz-select" class="form-input" style="font-size: 0.85rem; margin-bottom: 12px;">
+                                        ${userQuizzes.map(q => `<option value="${q.id}">${q.title}</option>`).join('')}
+                                    </select>
+                                ` : `
+                                    <p style="color: #6b7280; font-size: 0.8rem; text-align: center; padding: 12px 0;">
+                                        <i class="fa-regular fa-rectangle-list" style="display: block; font-size: 1.5rem; margin-bottom: 8px;"></i>
+                                        No quizzes generated yet. Try "From PDF" instead!
+                                    </p>
+                                `}
+                            </div>
                         </div>
-                        <button id="create-room-btn" class="btn btn-primary" ${userQuizzes.length === 0 ? 'disabled' : ''} style="width: 100%;">
-                            Create Room
+                        <button id="create-room-btn" class="btn btn-primary" ${pdfs.length === 0 && userQuizzes.length === 0 ? 'disabled' : ''} style="width: 100%;">
+                            <i class="fa-solid fa-bolt"></i> Create Room
                         </button>
-                        ${userQuizzes.length === 0 ? `
-                            <button id="go-practice-btn" class="btn btn-secondary" style="width: 100%; margin-top: 8px; font-size: 0.85rem;">
-                                <i class="fa-solid fa-sliders"></i> Go to Practice Tab to Create One
-                            </button>
-                        ` : ''}
                     </div>
 
                 </div>
             </div>
         `;
+
+        // --- Tab switching ---
+        let activeSource = 'pdf';
+        container.querySelectorAll('.host-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                activeSource = tab.getAttribute('data-source');
+                container.querySelectorAll('.host-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('host-source-pdf').style.display = activeSource === 'pdf' ? 'block' : 'none';
+                document.getElementById('host-source-existing').style.display = activeSource === 'existing' ? 'block' : 'none';
+            });
+        });
 
         // Go to Practice button click
         const goPracticeBtn = document.getElementById('go-practice-btn');
@@ -132,14 +197,49 @@ export async function renderLiveQuiz(container, app, routeParams) {
         const createBtn = document.getElementById('create-room-btn');
         if (createBtn) {
             createBtn.addEventListener('click', async () => {
-                const select = document.getElementById('host-quiz-select');
-                const quizId = select ? select.value : null;
-                if (!quizId) {
-                    app.showToast("Generate a quiz first from Quiz Setup!", 'warning');
-                    return;
-                }
+                createBtn.disabled = true;
+                createBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating...';
 
                 try {
+                    let quizId = null;
+
+                    if (activeSource === 'pdf') {
+                        // Quick-generate a quiz from selected PDF
+                        const pdfSelect = document.getElementById('host-pdf-select');
+                        const diffSelect = document.getElementById('host-difficulty');
+                        const qcountSelect = document.getElementById('host-qcount');
+                        if (!pdfSelect || !pdfSelect.value) {
+                            app.showToast("Select a PDF to generate from", 'warning');
+                            createBtn.disabled = false;
+                            createBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Create Room';
+                            return;
+                        }
+                        const quizRes = await app.apiFetch('/api/quizzes/generate', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                pdf_id: pdfSelect.value,
+                                num_questions: parseInt(qcountSelect.value),
+                                difficulty: diffSelect.value,
+                                time_limit: 30,
+                                gemini_api_key: app.state.geminiApiKey || null,
+                                language_mode: 'auto',
+                                question_types: ['mixed'],
+                            })
+                        });
+                        quizId = quizRes.quiz_id;
+                    } else {
+                        // Use existing quiz
+                        const select = document.getElementById('host-quiz-select');
+                        quizId = select ? select.value : null;
+                    }
+
+                    if (!quizId) {
+                        app.showToast("No quiz selected or generated", 'warning');
+                        createBtn.disabled = false;
+                        createBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Create Room';
+                        return;
+                    }
+
                     const res = await app.apiFetch('/api/rooms/create', {
                         method: 'POST',
                         body: JSON.stringify({ quiz_id: quizId, time_limit_per_q: 20 })
@@ -147,6 +247,8 @@ export async function renderLiveQuiz(container, app, routeParams) {
                     startPolling(res.code);
                 } catch (err) {
                     app.showToast("Failed to create room: " + err.message, 'error');
+                    createBtn.disabled = false;
+                    createBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Create Room';
                 }
             });
         }

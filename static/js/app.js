@@ -235,10 +235,34 @@ class App {
             throw new Error("Session expired. Please log in again.");
         }
         
-        const responseData = await response.json();
+        // Safely parse JSON — Cloud Run may return HTML error pages (502/503)
+        let responseData;
+        const contentType = response.headers.get('content-type') || '';
+        try {
+            if (contentType.includes('application/json')) {
+                responseData = await response.json();
+            } else {
+                const text = await response.text();
+                try {
+                    responseData = JSON.parse(text);
+                } catch {
+                    // Non-JSON response (e.g. HTML error page from Cloud Run)
+                    throw new Error(
+                        response.ok 
+                            ? "Unexpected server response format" 
+                            : `Server error (${response.status}): ${text.substring(0, 120)}`
+                    );
+                }
+            }
+        } catch (parseErr) {
+            if (parseErr.message.includes('Server error') || parseErr.message.includes('Unexpected server')) {
+                throw parseErr;
+            }
+            throw new Error(`Server error (${response.status}): Could not parse response`);
+        }
         
         if (!response.ok) {
-            throw new Error(responseData.detail || "An error occurred during the request.");
+            throw new Error(responseData.detail || `Server error (${response.status})`);
         }
         
         return responseData;
