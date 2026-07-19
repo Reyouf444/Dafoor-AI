@@ -188,6 +188,92 @@ def _extract_with_pypdf(pdf_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Sentence-BERT (SBERT) Semantic Ranking & Noise Filtering Engine
+# Uses lightweight 'all-MiniLM-L6-v2' (~80MB) for fast CPU execution
+# ---------------------------------------------------------------------------
+
+_sbert_model = None
+
+def _get_sbert_model():
+    global _sbert_model
+    if _sbert_model is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            _sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
+        except Exception as e:
+            print(f"Notice: sentence-transformers SBERT model unavailable ({e}). Using rule-based semantic filter.")
+            _sbert_model = False
+    return _sbert_model if _sbert_model is not False else None
+
+
+def _is_meaningful_sentence(sent: str) -> bool:
+    """Filter out noisy, trivial, or pronoun-heavy filler sentences like 'you', 'her', 'he', etc."""
+    s = sent.strip()
+    if len(s) < 25 or len(s) > 250:
+        return False
+
+    words = s.split()
+    if len(words) < 5:
+        return False
+
+    first_word = words[0].lower().strip(".,;:!?\"'()")
+    # Exclude sentences starting with low-quality filler pronouns or meaningless noise
+    trivial_starts = {
+        "you", "he", "she", "her", "him", "his", "hers", "them", "they",
+        "it", "its", "we", "us", "our", "me", "my", "myself", "yourself",
+        "himself", "herself", "themselves", "this", "these", "those", "that",
+        "who", "whom", "whose", "which", "what", "where", "when", "why", "how"
+    }
+    if first_word in trivial_starts:
+        return False
+
+    # Count filler pronoun density
+    pronoun_count = sum(1 for w in words if w.lower().strip(".,;:!?\"'()") in trivial_starts)
+    if pronoun_count / len(words) > 0.25:
+        return False
+
+    # Filter out common header/footer/page number patterns
+    if re.search(r'^(page|\d+|chapter|figure|table|contents|index|copyright|all rights reserved)\b', s, re.I):
+        return False
+
+    return True
+
+
+def _sbert_rank_sentences(text: str, top_k: int = 35) -> list:
+    """Rank candidate sentences by semantic centrality using Sentence-BERT embeddings."""
+    raw_sentences = re.split(r'(?<=[.!?\n])\s+', text)
+    clean_candidates = [s.strip() for s in raw_sentences if _is_meaningful_sentence(s)]
+
+    if not clean_candidates:
+        return [s.strip() for s in raw_sentences if len(s.strip()) > 30][:top_k]
+
+    model = _get_sbert_model()
+    if not model:
+        return clean_candidates[:top_k]
+
+    try:
+        import numpy as np
+        # Compute SBERT embeddings for candidate sentences
+        embeddings = model.encode(clean_candidates, convert_to_numpy=True, show_progress_bar=False)
+        
+        # Calculate overall document centroid embedding
+        doc_centroid = np.mean(embeddings, axis=0, keepdims=True)
+        
+        # Compute Cosine Similarities between sentence embeddings and document centroid
+        norm_emb = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-9)
+        norm_centroid = doc_centroid / (np.linalg.norm(doc_centroid, axis=1, keepdims=True) + 1e-9)
+        scores = np.dot(norm_emb, norm_centroid.T).flatten()
+
+        # Sort sentences by semantic importance score (highest first)
+        ranked_indices = np.argsort(-scores)
+        ranked_sentences = [clean_candidates[idx] for idx in ranked_indices[:top_k]]
+        return ranked_sentences
+    except Exception as e:
+        print(f"SBERT ranking fallback: {e}")
+        return clean_candidates[:top_k]
+
+
+# ---------------------------------------------------------------------------
 # Local heuristic quiz generator (Arabic + English)
 # ---------------------------------------------------------------------------
 
@@ -297,17 +383,18 @@ def _heuristic_arabic(text: str, count: int) -> list:
 
 
 def _heuristic_english(text: str, count: int) -> list:
-    """Heuristic question extraction for English text."""
+    """SBERT-enhanced question extraction for English text."""
     questions = []
-    sentences = re.split(r'(?<=[.!?])\s+', text)
+    sentences = _sbert_rank_sentences(text, top_k=40)
     definitions = []
     fill_blanks = []
 
-    for sent in sentences:
-        sent = sent.strip()
-        if len(sent) < 30 or len(sent) > 200:
-            continue
+    trivial_words = {
+        "it", "this", "they", "there", "these", "that", "which", "you", "she", "he",
+        "her", "him", "his", "hers", "them", "we", "us", "our", "the", "with", "from"
+    }
 
+    for sent in sentences:
         match = re.search(
             r'\b([A-Z][a-zA-Z0-9\s-]{2,25})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]+)',
             sent
@@ -315,15 +402,15 @@ def _heuristic_english(text: str, count: int) -> list:
         if match:
             term = match.group(1).strip()
             meaning = match.group(3).strip()
-            if term.lower() not in ["it", "this", "they", "there", "these", "that", "which"]:
+            if term.lower() not in trivial_words and len(term) >= 3:
                 definitions.append({"term": term, "definition": meaning, "sentence": sent})
                 continue
 
         match_cloze = re.search(r'\b([A-Z][a-zA-Z0-9-]{3,15})\b', sent)
         if match_cloze:
             kw = match_cloze.group(1)
-            if kw.lower() not in ["the", "this", "that", "with", "from", "when", "what", "where", "whom"]:
-                blanked = sent.replace(kw, "_____")
+            if kw.lower() not in trivial_words:
+                blanked = sent.replace(kw, "_____", 1)
                 fill_blanks.append({"keyword": kw, "blanked": blanked, "sentence": sent})
 
     for d in definitions:
@@ -666,41 +753,59 @@ def generate_flashcards(text: str, count: int = 20, api_key: str = None) -> list
 
 
 def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
-    """Extract term/definition pairs using regex heuristics with fallback to sentence splitting."""
+    """Extract term/definition pairs using SBERT semantic ranking & quality filters."""
     cards = []
-    text_clean = re.sub(r'\s+', ' ', text)
+    top_sentences = _sbert_rank_sentences(text, top_k=40)
+
+    trivial_words = {
+        "you", "he", "she", "her", "him", "his", "hers", "them", "they",
+        "it", "its", "we", "us", "our", "me", "my", "myself", "yourself",
+        "himself", "herself", "themselves", "this", "these", "those", "that"
+    }
 
     if is_arabic:
         pattern = re.compile(
             r'([\u0600-\u06FF\s]{3,30})\s+(هو|هي|يعني|تعني|يُعرَّف بأنه|هي عبارة عن)\s+([\u0600-\u06FF\s،.]{10,150})'
         )
+        for s in top_sentences:
+            match = pattern.search(s)
+            if match:
+                term = match.group(1).strip()
+                definition = match.group(3).strip()
+                if len(term) > 2 and len(definition) > 10:
+                    cards.append({"front": term, "back": definition})
+            if len(cards) >= count:
+                break
     else:
         pattern = re.compile(
             r'\b([A-Z][a-zA-Z0-9\s-]{2,30})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]{10,150})'
         )
+        for s in top_sentences:
+            match = pattern.search(s)
+            if match:
+                term = match.group(1).strip()
+                definition = match.group(3).strip()
+                if term.lower() not in trivial_words and len(term) > 2 and len(definition) > 10:
+                    cards.append({"front": term, "back": definition})
+            if len(cards) >= count:
+                break
 
-    for match in pattern.finditer(text_clean):
-        term = match.group(1).strip()
-        definition = match.group(3).strip()
-        if len(term) > 2 and len(definition) > 10:
-            cards.append({"front": term, "back": definition})
-        if len(cards) >= count:
-            break
-
-    # If heuristic regex didn't find enough cards, extract from key sentences
+    # Fill remaining card quota using SBERT top sentences
     if len(cards) < count:
-        sentences = [s.strip() for s in re.split(r'[.!?\n]+', text) if len(s.strip()) > 25]
-        for s in sentences:
+        for s in top_sentences:
             if len(cards) >= count:
                 break
             parts = s.split(':', 1)
             if len(parts) == 2 and 3 <= len(parts[0].strip()) <= 40 and len(parts[1].strip()) >= 15:
-                cards.append({"front": parts[0].strip(), "back": parts[1].strip()})
+                t = parts[0].strip()
+                d = parts[1].strip()
+                if t.lower() not in trivial_words:
+                    cards.append({"front": t, "back": d})
             else:
                 words = s.split()
-                if len(words) >= 8:
-                    front = " ".join(words[:4])
-                    back = " ".join(words[4:])
+                if len(words) >= 8 and words[0].lower() not in trivial_words:
+                    front = " ".join(words[:3])
+                    back = " ".join(words[3:])
                     cards.append({"front": front, "back": back})
 
     return cards[:count]
