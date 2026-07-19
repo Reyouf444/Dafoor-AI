@@ -34,8 +34,9 @@ export function renderAuth(container, app) {
         container.innerHTML = `
             <div class="auth-wrapper">
                 <div class="card auth-card">
-                    <!-- Dynamic Lottie Logo Animation -->
-                    <div id="logo-animation" style="width: 80px; height: 80px; margin: 0 auto 16px auto;"></div>
+                    <div class="auth-brand-logo-wrapper" style="text-align: center; margin: 0 auto 20px auto;">
+                        <img src="assets/dafoor_brand_logo.png" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
+                    </div>
                     <div class="auth-header">
                         <h2>${isLoginMode ? 'Welcome Back' : 'Get Started'}</h2>
                         <p>${isLoginMode ? 'Access your Dafoor AI account' : 'Create an account to start studying smarter'}</p>
@@ -170,7 +171,9 @@ export function renderAuth(container, app) {
         container.innerHTML = `
             <div class="auth-wrapper">
                 <div class="card auth-card">
-                    <div id="logo-animation" style="width: 80px; height: 80px; margin: 0 auto 16px auto;"></div>
+                    <div class="auth-brand-logo-wrapper" style="text-align: center; margin: 0 auto 20px auto;">
+                        <img src="assets/dafoor_brand_logo.png" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
+                    </div>
                     <div class="auth-header">
                         <h2>Set New Password</h2>
                         <p>Choose a strong password for your Dafoor AI account.</p>
