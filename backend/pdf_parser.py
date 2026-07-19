@@ -207,7 +207,7 @@ def _get_sbert_model():
 
 
 def _is_meaningful_sentence(sent: str) -> bool:
-    """Filter out noisy, trivial, or pronoun-heavy filler sentences like 'you', 'her', 'he', etc."""
+    """Filter out noisy, trivial, pronoun-heavy, and boilerplate filler sentences."""
     s = sent.strip()
     if len(s) < 25 or len(s) > 250:
         return False
@@ -236,6 +236,50 @@ def _is_meaningful_sentence(sent: str) -> bool:
     if re.search(r'^(page|\d+|chapter|figure|table|contents|index|copyright|all rights reserved)\b', s, re.I):
         return False
 
+    # Filter out legal/boilerplate/disclaimer text
+    s_lower = s.lower()
+    boilerplate_phrases = [
+        "all rights reserved", "provided on an", "as is", "without warranty",
+        "no liability", "disclaimer", "terms of use", "terms and conditions",
+        "permission is granted", "may not be reproduced", "proprietary",
+        "confidential", "trade secret", "published by", "printed in",
+        "isbn", "edition", "acknowledgment", "about the author",
+        "table of contents", "visit us at", "www.", "http://", "https://",
+        ".com", ".org", ".net", "click here", "for more information",
+        "unauthorized", "written permission", "redistributed",
+    ]
+    for phrase in boilerplate_phrases:
+        if phrase in s_lower:
+            return False
+
+    return True
+
+
+def _is_quality_term(term: str) -> bool:
+    """Check if a matched term is a real concept, not an article/filler phrase."""
+    t = term.strip()
+    if len(t) < 3:
+        return False
+    first_word = t.split()[0].lower() if t.split() else ""
+    # Reject terms that start with articles, prepositions, or common filler
+    bad_starts = {
+        "the", "a", "an", "some", "any", "all", "each", "every",
+        "no", "not", "but", "and", "or", "if", "so", "for",
+        "in", "on", "at", "to", "of", "by", "as", "up", "out",
+        "its", "our", "your", "my", "his", "her", "their",
+    }
+    if first_word in bad_starts:
+        return False
+    # Reject purely lowercase terms (not a proper noun or acronym)
+    if t[0].islower():
+        return False
+    # Reject single very common words
+    single_rejects = {
+        "information", "data", "example", "note", "result", "value",
+        "section", "part", "step", "point", "list", "name", "type",
+    }
+    if t.lower() in single_rejects:
+        return False
     return True
 
 
@@ -402,14 +446,14 @@ def _heuristic_english(text: str, count: int) -> list:
         if match:
             term = match.group(1).strip()
             meaning = match.group(3).strip()
-            if term.lower() not in trivial_words and len(term) >= 3:
+            if _is_quality_term(term) and len(meaning) >= 10:
                 definitions.append({"term": term, "definition": meaning, "sentence": sent})
                 continue
 
         match_cloze = re.search(r'\b([A-Z][a-zA-Z0-9-]{3,15})\b', sent)
         if match_cloze:
             kw = match_cloze.group(1)
-            if kw.lower() not in trivial_words:
+            if _is_quality_term(kw):
                 blanked = sent.replace(kw, "_____", 1)
                 fill_blanks.append({"keyword": kw, "blanked": blanked, "sentence": sent})
 
@@ -753,15 +797,10 @@ def generate_flashcards(text: str, count: int = 20, api_key: str = None) -> list
 
 
 def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
-    """Extract term/definition pairs using SBERT semantic ranking & quality filters."""
+    """Extract term/definition pairs using quality filters and smart extraction."""
     cards = []
-    top_sentences = _sbert_rank_sentences(text, top_k=40)
-
-    trivial_words = {
-        "you", "he", "she", "her", "him", "his", "hers", "them", "they",
-        "it", "its", "we", "us", "our", "me", "my", "myself", "yourself",
-        "himself", "herself", "themselves", "this", "these", "those", "that"
-    }
+    seen_terms = set()  # Prevent duplicate terms
+    top_sentences = _sbert_rank_sentences(text, top_k=60)
 
     if is_arabic:
         pattern = re.compile(
@@ -772,11 +811,13 @@ def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
             if match:
                 term = match.group(1).strip()
                 definition = match.group(3).strip()
-                if len(term) > 2 and len(definition) > 10:
+                if len(term) > 2 and len(definition) > 10 and term not in seen_terms:
                     cards.append({"front": term, "back": definition})
+                    seen_terms.add(term)
             if len(cards) >= count:
                 break
     else:
+        # Step 1: Extract clean term/definition pairs from "X is/are/means Y" patterns
         pattern = re.compile(
             r'\b([A-Z][a-zA-Z0-9\s-]{2,30})\b\s+(is|are|refers to|is defined as|means)\s+([^.!?]{10,150})'
         )
@@ -785,27 +826,48 @@ def _heuristic_flashcards(text: str, count: int, is_arabic: bool) -> list:
             if match:
                 term = match.group(1).strip()
                 definition = match.group(3).strip()
-                if term.lower() not in trivial_words and len(term) > 2 and len(definition) > 10:
+                if _is_quality_term(term) and len(definition) > 10 and term.lower() not in seen_terms:
                     cards.append({"front": term, "back": definition})
+                    seen_terms.add(term.lower())
             if len(cards) >= count:
                 break
 
-    # Fill remaining card quota using SBERT top sentences
-    if len(cards) < count:
-        for s in top_sentences:
-            if len(cards) >= count:
-                break
-            parts = s.split(':', 1)
-            if len(parts) == 2 and 3 <= len(parts[0].strip()) <= 40 and len(parts[1].strip()) >= 15:
-                t = parts[0].strip()
-                d = parts[1].strip()
-                if t.lower() not in trivial_words:
-                    cards.append({"front": t, "back": d})
-            else:
-                words = s.split()
-                if len(words) >= 8 and words[0].lower() not in trivial_words:
-                    front = " ".join(words[:3])
-                    back = " ".join(words[3:])
-                    cards.append({"front": front, "back": back})
+        # Step 2: Extract "Term: definition" colon-separated pairs
+        if len(cards) < count:
+            for s in top_sentences:
+                if len(cards) >= count:
+                    break
+                parts = s.split(':', 1)
+                if len(parts) == 2:
+                    t = parts[0].strip()
+                    d = parts[1].strip()
+                    if _is_quality_term(t) and 3 <= len(t) <= 40 and len(d) >= 15 and t.lower() not in seen_terms:
+                        cards.append({"front": t, "back": d})
+                        seen_terms.add(t.lower())
+
+        # Step 3: Extract key technical terms from sentences and use the sentence as the definition
+        if len(cards) < count:
+            # Find capitalized multi-word terms or acronyms in sentences
+            term_pattern = re.compile(r'\b([A-Z][a-zA-Z]{2,}(?:\s[A-Z][a-zA-Z]+){0,3})\b')
+            acronym_pattern = re.compile(r'\b([A-Z]{2,6})\b')
+            for s in top_sentences:
+                if len(cards) >= count:
+                    break
+                # Try multi-word proper noun terms first
+                term_match = term_pattern.search(s)
+                if term_match:
+                    term = term_match.group(1).strip()
+                    if _is_quality_term(term) and term.lower() not in seen_terms:
+                        # Use the full sentence as the definition/explanation
+                        cards.append({"front": term, "back": s.strip()})
+                        seen_terms.add(term.lower())
+                        continue
+                # Try acronyms (e.g. TCP, VLAN, OSPF)
+                acr_match = acronym_pattern.search(s)
+                if acr_match:
+                    acr = acr_match.group(1).strip()
+                    if len(acr) >= 2 and acr not in seen_terms and acr not in {"THE", "AND", "FOR", "NOT", "BUT", "ALL", "ANY"}:
+                        cards.append({"front": acr, "back": s.strip()})
+                        seen_terms.add(acr)
 
     return cards[:count]
