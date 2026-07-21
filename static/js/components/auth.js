@@ -35,7 +35,7 @@ export function renderAuth(container, app) {
             <div class="auth-wrapper">
                 <div class="card auth-card">
                     <div class="auth-brand-logo-wrapper" style="text-align: center; margin: 0 auto 20px auto;">
-                        <img src="assets/dafoor_brand_logo.png?v=2" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
+                        <img src="assets/dafoor_brand_logo.png?v=3" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
                     </div>
                     <div class="auth-header">
                         <h2>${isLoginMode ? 'Welcome Back' : 'Get Started'}</h2>
@@ -172,7 +172,7 @@ export function renderAuth(container, app) {
             <div class="auth-wrapper">
                 <div class="card auth-card">
                     <div class="auth-brand-logo-wrapper" style="text-align: center; margin: 0 auto 20px auto;">
-                        <img src="assets/dafoor_brand_logo.png?v=2" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
+                        <img src="assets/dafoor_brand_logo.png?v=3" alt="Dafoor AI Logo" class="auth-brand-logo" style="max-height: 140px; width: auto; max-width: 100%; filter: drop-shadow(0 6px 20px rgba(16, 185, 129, 0.3)); transition: transform 0.3s ease;" />
                     </div>
                     <div class="auth-header">
                         <h2>Set New Password</h2>
